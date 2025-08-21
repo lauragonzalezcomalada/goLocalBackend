@@ -1,6 +1,8 @@
 from django.urls import path
-from .views import (hello_world, place_detail,get_all_places,activities,private_plans, tags, user_profile,sign_in,
-                    google_sign_in,updateActivityAssistance,update_user,promos,create_event,user_prorfile_from_uuid,search_users,update_item_details)
+
+from api.serializers import CampoReservaSerializer
+from .views import (ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_payment, create_ticket, createSplitPayment, entradasForUserAdmin, export_to_excel, extendPlanWebHook, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, tags, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketsLink, user_profile,sign_in,
+                    google_sign_in,updateActivityAssistance,update_user,promos,create_event,user_prorfile_from_uuid,search_users,update_item_details, userCreatedEventsForTheWeek, validate_ticket,soldTicketsForEvent, templates)
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import (TokenObtainPairView,TokenRefreshView,)
@@ -23,7 +25,42 @@ urlpatterns = [
     path('userProfile/', user_prorfile_from_uuid, name="user_prorfile_from_uuid"),
     path('search_users/', search_users, name="search_users"),
     path('private_plans/', private_plans, name="private_plans"),
-    path('update_item/', update_item_details,name = "update_item_details")
+    path('update_item/', update_item_details,name = "update_item_details"),
+    path('add_item/', add_item, name="add_item"),
+    path('accept_invitation/', accept_invitation, name='accept_invitation'),
+    path('i/<str:invitation_code>/', invitation_redirect, name='invitation-redirect'),
+    path('validate_ticket/', validate_ticket, name='validate_ticket'),
+    path('create_tickets/', create_ticket, name='create_ticket'),
+    path('get_tickets/', get_tickets, name="get_tickets"),
+    
+
+
+    ##Aquí aniran les calls només pel goLocalWeb
+    path('events_for_the_week/', userCreatedEventsForTheWeek, name="userCreatedEventsForTheWeek"),
+    path('entradas_user_admin/', entradasForUserAdmin, name="entradasForUserAdmin"),
+    path('sold_tickets_for_event/',soldTicketsForEvent, name = "soldTicketsForEvent"),
+    path('update_entrada/', updateEntrada, name ="updateEntrada"),
+    path('update_reserva/', updateReserva, name = "updateReserva"),
+    path('campos_reserva/', camposReserva, name='camposReserva'),   
+    path('templates/', templates, name='templates'),
+    path('update_reserva_status/', updateReservaStatus, name="updateReservaStatus"),
+    path('update_tickets_link/', updateTicketsLink, name="updateTicketsLink"),
+    path('handle_visibility_change/', updateActiveStatus, name="updateActiveStatus"),
+    path('update_pwd/', updatePassword, name="updatePassword"),
+    path('able_turn_visible/', ableToTurnVisible, name="ableToTurnVisible"),
+    path('billing_status/', billingStatus, name="billingStatus"),
+    path('bonos/', bonos, name="bonos"),
+    path('payment_events_ranges/', paymentEventsRanges, name="paymentEventsRanges"),
+    path('export-pagos-excel/', export_to_excel, name="export_to_excel"),
+
+    #mercadopago
+    path('create_test_payment/', create_payment, name="export_to_excel"),
+    path('webhook/extend_plan/', extendPlanWebHook, name="extendPlanWebHook"),
+    path('generate_oauth_mp_link/', generateOauthMpLink, name="generate_oauth_mp_link"),
+    path('success_oauth_registration/', obtainAccessTokenVendedor, name="getAccessTokenVendedor"),
+    path('create_split_payment/', createSplitPayment, name="createSplitPayment")
+
+
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

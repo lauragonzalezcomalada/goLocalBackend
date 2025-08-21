@@ -61,14 +61,19 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'corsheaders.middleware.CorsMiddleware'
 ]
-
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Agrega el origen de tu frontend aquí
     "http://127.0.0.1:8000",  # O el origen de tu servidor
+    "http://localhost:5173",
+    "http://192.168.1.33:5173",
+    "http://192.168.1.34:5173",
+    
+
 ]
 
-ALLOWED_HOSTS = ['192.168.0.17', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['192.168.0.17', 'localhost', '127.0.0.1','192.168.1.39','192.168.1.33','192.168.0.167','192.168.0.93','192.168.1.34',]
 
 
 ROOT_URLCONF = 'worldwild_backend.urls'
@@ -76,7 +81,7 @@ ROOT_URLCONF = 'worldwild_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

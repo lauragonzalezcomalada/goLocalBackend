@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Abriendo Plan Privado...</title>
+    <script>
+        function openDeepLink() {
+            var deepLink = "{{ deep_link }}";
+            var fallback = "{{ web_fallback_url }}";
+
+            var now = Date.now();
+            // Intentamos abrir el deep link
+            window.location = deepLink;
+
+            // Si después de 2 segundos el usuario sigue aquí, redirigimos al fallback web
+            setTimeout(function () {
+                if (Date.now() - now < 2500) {
+                    window.location = fallback;
+                }
+            }, 2000);
+        }
+
+        window.onload = function () {
+            var isMobile = "{{ is_mobile|yesno:'true,false' }}" === "true";
+            if (isMobile) {
+                openDeepLink();
+            } else {
+                window.location = "{{ web_fallback_url }}";
+            }
+        };
+    </script>
+</head>
+
+<body>
+    <p>Abriendo la aplicación...</p>
+    <p>Si no pasa nada, <a href="{{ web_fallback_url }}">clic aquí para ir al sitio web</a>.</p>
+</body>
+
+</html>
