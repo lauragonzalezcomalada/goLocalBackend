@@ -14,7 +14,7 @@ DATABASES = {
 
 
 DEBUG = False
-ALLOWED_HOSTS = ["staging.tuapp.com"]
+ALLOWED_HOSTS = ["https://golocalbackend.onrender.com"]
 
 # Logs en consola para revisar staging
 LOGGING = {
