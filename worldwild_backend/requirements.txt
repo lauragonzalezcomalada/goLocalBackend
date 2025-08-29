@@ -44,3 +44,4 @@ django
 python-dotenv
 dj-database-url
 gunicorn
+whitenoise==6.5.0
