@@ -300,9 +300,9 @@ def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code):
         Spacer(1, 5*mm), 
         Paragraph(f"Comprador: {buyer_name}", normal_style),
         Spacer(1, 5*mm), 
-        Paragraph(f"Fecha: {timezone.localtime(event_time).strftime("%d/%m/%Y")}", normal_style),
+        Paragraph(f"Fecha: {timezone.localtime(event_time).strftime('%d/%m/%Y')}", normal_style),
         Spacer(1, 3*mm), 
-        Paragraph(f"Hora: {timezone.localtime(event_time).strftime("%H:%M")}", normal_style),
+        Paragraph(f"Hora: {timezone.localtime(event_time).strftime('%H:%M')}", normal_style),
 
     ]
 
