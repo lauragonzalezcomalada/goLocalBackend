@@ -7,6 +7,11 @@ DATABASES = {
     )
 }
 
+DATABASES = {
+    'default': dj_database_url.config(default='postgresql://golocalbackend_staging_user:vFySJwYrgST8yKCIlqbxiecHVOvpJ0VB@dpg-d2osaqripnbc73a6onpg-a/golocalbackend_staging')
+}
+
+
 
 DEBUG = False
 ALLOWED_HOSTS = ["staging.tuapp.com"]
