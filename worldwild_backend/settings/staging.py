@@ -9,7 +9,7 @@ DATABASES = {
 ROOT_URLCONF = "worldwild_backend.urls"
 
 DEBUG = False
-ALLOWED_HOSTS = ["https://golocalbackend.onrender.com"]
+ALLOWED_HOSTS = ['golocalbackend.onrender.com','127.0.0.1']
 
 # Logs en consola para revisar staging
 LOGGING = {
