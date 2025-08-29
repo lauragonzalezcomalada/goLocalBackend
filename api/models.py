@@ -182,7 +182,7 @@ class UserProfile(models.Model):
     promos = models.ManyToManyField(Promo,blank = True, related_name='promos')
     siguiendo = models.ManyToManyField('self', symmetrical=False, related_name='seguidores', blank=True)
     telefono = models.IntegerField(null = True, blank = True)
-    available_planes_gratis = models.IntegerField(default=8)
+    available_planes_gratis = models.IntegerField(default=8, null=True, blank = True)
     payment_events_range = models.OneToOneField(
         PaymentEventsRanges,
         on_delete=models.SET_NULL,

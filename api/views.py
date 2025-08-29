@@ -7,12 +7,15 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Activity, Bono, CampoReserva, EntradasForPlan, EventTemplate, ItemPlan, PaymentEventsRanges, PaymentForUse, Place, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm, Tag, Ticket, UserProfile, User
-from .serializers import ActivitySerializer, BonoSerializer, CampoReservaSerializer, EventTemplateSerializer, ItemSerializer, PaymentEventsRangesSerializer, PlaceSerializer, PrivatePlanSerializer, PromoSerializer, ReservaFormSerializer, ReservaSerializer, TagSerializer, TicketSerializer, UserProfileBasicSerializer,UserProfileSerializer
+from .serializers import ActivitySerializer, ActivitySerializerForGoLocalQR, BonoSerializer, CampoReservaSerializer, EventTemplateSerializer, ItemSerializer, PaymentEventsRangesSerializer, PlaceSerializer, PrivatePlanSerializer, PromoSerializer, ReservaFormSerializer, ReservaSerializer, TagSerializer, TicketSerializer, UserProfileBasicSerializer,UserProfileSerializer
 import ast 
 from datetime import datetime, timedelta, date
 from django.utils import timezone
 from django.db.models import Count
 
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework.exceptions import PermissionDenied
 
 
 
@@ -21,6 +24,27 @@ def hello_world(request):
     return Response({'message': 'Hello from Django!'})
 
 
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    print('token/-creador')
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        require_creador = self.context['request'].data.get('require_creador', False)
+        print('required_creator')
+        print(require_creador)
+        if require_creador:
+            user = self.user
+            print('user')
+            print(user)
+            print(user.profile.creador)
+            if not hasattr(user, 'profile') or not user.profile.creador:
+                print('no creador')
+                raise PermissionDenied("El usuario no tiene permisos de creador") #codigo 403
+        print(data)
+        return data
+    
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 @api_view(['GET'])
 def get_all_places(request):
@@ -62,7 +86,7 @@ def activities(request): #hacer doble view
             except Place.DoesNotExist:
                 return Response({'error': 'No place found according to your uuid'}, status=404)
                     
-            activities = Activity.objects.filter(place__uuid=place_uuid,startDateandtime__gte=timezone.now()).order_by('startDateandtime')
+            activities = Activity.objects.filter(place__uuid=place_uuid,startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
             print(activities)
             
             if not activities.exists:
@@ -122,8 +146,57 @@ def promos(request):
         else:
             return Response({'error':'Neither place or activity submitted'},status=404)
 
-    
+@api_view(['GET'])
+def registerView(request): 
 
+    #GET ALL TAGS
+    activity = request.GET.get('activity',None)
+    promo = request.GET.get('promo',None)
+    uuid = request.GET.get('uuid')
+    
+    if activity:
+        try:
+            activity = Activity.objects.get(uuid = uuid)
+            activity.views +=1
+            activity.save()
+        except Activity.DoesNotExist:
+            return Response('Error actualizando views de la actividad')
+    elif promo: 
+        try:
+            promo = Promo.objects.get(uuid = uuid)
+            promo.views +=1
+            promo.save()
+        except Promo.DoesNotExist:
+            return Response('Error actualizando views de la actividad')
+    return Response(status = 200)
+
+@api_view(['GET'])
+def registerShare(request): 
+
+    #GET ALL TAGS
+    activity = request.GET.get('activity',None)
+    promo = request.GET.get('promo',None)
+    uuid = request.GET.get('uuid')
+
+    print('activity: ', activity)
+    print('promo: ', promo)
+    print('uuid: ', uuid)
+    
+    if activity:
+        try:
+            activity = Activity.objects.get(uuid = uuid)
+            activity.shares +=1
+            activity.save()
+        except Activity.DoesNotExist:
+            return Response('Error actualizando views de la actividad')
+    elif promo: 
+        try:
+            promo = Promo.objects.get(uuid = uuid)
+            promo.shares +=1
+            promo.save()
+        except Promo.DoesNotExist:
+            return Response('Error actualizando views de la actividad')
+    return Response(status = 200)
     
 
 @api_view(['GET'])
@@ -144,23 +217,113 @@ def tags(request):
 def validate_ticket(request):
     print('in validate ticket')
     ticket_uuid = request.GET.get('ticket', None)
+    event_uuid = request.GET.get('scanning_event', None)
     print(ticket_uuid)
     if not ticket_uuid:
         return Response({'error': 'Ticket UUID is required'}, status=400)
 
     try:
-        ticket = Ticket.objects.get(uuid=ticket_uuid)
+        ticket = Ticket.objects.get(uuid=ticket_uuid, entrada__activity__uuid=event_uuid)
     except Ticket.DoesNotExist:
-        return Response({'error': 'Ticket not found'}, status=404)
+        return Response({'error': 'Ticket not found, or not from this event'}, status=405)
 
-    # Aquí podrías agregar lógica adicional para validar el ticket, como verificar si está expirado o si ya ha sido usado.
-    return Response(status=200)
-    #return Response({
-    #    'uuid': ticket.uuid,
-    #    'content_type': ticket.content_type.model,
-    #    'object_id': ticket.object_id,
-    #    'valid': True  # O cualquier otra lógica de validación que necesites
-    #})
+    if ticket.status == 0: #No asistido, correcto, actualizamos a 1 y devolvemos success
+        ticket.status = 1
+        ticket.save()
+
+        actividad = ticket.entrada.activity
+        total_asistidos = Ticket.objects.filter(
+            entrada__activity=actividad,
+            status=1
+        ).count()
+
+        return Response({'asistidos': total_asistidos}, status = 200)
+    elif ticket.status == 1: #Asistido, ticket ya usado
+        return Response('El ticket ya fue usado antes', status= 404)
+
+
+from django.core.mail import EmailMessage
+from io import BytesIO
+from reportlab.lib.pagesizes import A6
+from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Paragraph,Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.units import mm
+from PIL import Image as PILImage
+
+
+
+
+
+def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A6,
+                            rightMargin=10*mm, leftMargin=10*mm,
+                            topMargin=10*mm, bottomMargin=10*mm)
+    
+
+    qr_size = 60*mm
+    width, height = A6
+    # --- Texto ---
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'title',
+        parent=styles['Heading1'],
+        fontSize=22,
+        alignment=TA_CENTER,
+        textColor='#FF6600'
+    )
+    normal_style = ParagraphStyle(
+        'normal',
+        parent=styles['Normal'],
+        fontSize=18,
+        alignment=TA_CENTER,
+        textColor="#D34343"
+    )
+
+    #pil_img = Image.open(qr_code)
+
+    pil_img = PILImage.open(qr_code)
+    qr_io = BytesIO()
+    pil_img.save(qr_io, format='PNG')
+    qr_io.seek(0)
+    
+    qr_img = Image(qr_io, width=60*mm, height=60*mm)
+    qr_img.hAlign = 'CENTER'
+
+    story = [
+        Paragraph(event_name.upper(), title_style),
+        Spacer(1, 5*mm), 
+        #pil_img,
+        qr_img,
+        Spacer(1, 5*mm), 
+        Paragraph(f"Comprador: {buyer_name}", normal_style),
+        Spacer(1, 5*mm), 
+        Paragraph(f"Fecha: {timezone.localtime(event_time).strftime("%d/%m/%Y")}", normal_style),
+        Spacer(1, 3*mm), 
+        Paragraph(f"Hora: {timezone.localtime(event_time).strftime("%H:%M")}", normal_style),
+
+    ]
+
+
+    #qr_io = BytesIO()
+   # pil_img.save(qr_io, format="PNG")
+   # qr_io.seek(0)
+    #c.drawInlineImage(pil_img,(width - qr_size) / 2 , (height - qr_size) / 2, qr_size, qr_size)
+
+
+    # Frame centrado en el PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+
+
+
+from django.core.mail import send_mail
+from django.conf import settings
 @api_view(['POST'])
 def create_ticket(request):
     data = request.data.copy()
@@ -186,19 +349,21 @@ def create_ticket(request):
     cantidad = data.get('cantidad')
     print('antes de crear tickets')
     print(entrada.disponibles)
-
-    for i in range(cantidad):
+    tickets = []
+    print(data)
+    for i in range(cantidad):  #map de ['tipus_entrada_1__uuid":{"amount..."}, 'tipus_entrada_2__uuid':{xxx}]
         if(entrada.disponibles > 0):
             ticket = Ticket.objects.create(
             user_profile=userProfile,
             entrada=entrada,
-            nombre= userProfile.user.first_name,
-            email= userProfile.user.email,
+            nombre= data['name'],
+            email= data['email'],
             fecha_compra=timezone.now(),
             precio = entrada.precio
             )
             print(ticket)
             entrada.disponibles = entrada.disponibles -1
+            tickets.append(generar_ticket_pdf(data['name'],entrada.activity.name, entrada.activity.startDateandtime,ticket.qr_code))
         else:
             print('no quedan más entradas')
     entrada.save()
@@ -206,6 +371,27 @@ def create_ticket(request):
     print(entrada.disponibles)
     userProfile.activities.add(entrada.activity)
     userProfile.save()
+
+
+    email = EmailMessage(
+        subject="Tu ticket para el evento 🎟️",
+        body=f"Hola {data['name']}, adjuntamos tu ticket para {entrada.activity.name}.\n¡Nos vemos el {entrada.activity.startDateandtime}!",
+        from_email="no-reply@miapp.com",
+        to=[data['email']],
+    )
+    print('tickets: ', tickets)
+
+
+    # Adjuntar PDF
+    for i, ticket in enumerate(tickets):
+    # ticket es un BytesIO o archivo
+        ticket.seek(0)
+        email.attach(f"ticket_{i+1}.pdf", ticket.read(), "application/pdf")
+  #  email.attach("ticket.pdf", tickets.read(), "application/pdf")
+
+    # Enviar
+    email.send()
+
     return Response(status=201)
 
 
@@ -708,21 +894,21 @@ def create_event(request):
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=401)
 
-    data = request.data.copy()    
+    data = request.data   
     print(data)
-    lat = request.data.get('lat')
-    lng = request.data.get('lng')
+    lat = float(data['lat'])
+    lng = float(data['lng'])
     nearest_place = find_nearest_place(lat, lng)
     is_private_plan = data['tipoEvento'] == '2'
     tipoEvento = int(data['tipoEvento'])
     print(tipoEvento)
-    tags_list = request.data.get('tags', '[]')
+    tags_list = data['tags']
     print('isprivateplan', is_private_plan)
     if is_private_plan == False:
         print('is not private plan')
         # Parsear la lista de tags correctamente
         
-        tags_raw = request.data.get('tags', '[]')
+        tags_raw = data['tags']
         
         try:
             tags_list = ast.literal_eval(tags_raw)
@@ -754,7 +940,6 @@ def create_event(request):
     if data['gratis'] == True:
         data['reserva_necesaria'] = request.data.get('reserva') == 'true'
 
-  
     if (data['gratis'] == False and tipoEvento == 0): #gratis = False i es activity
         data['control_entradas'] = request.data.get('centralizarEntradas') == 'true'
         
@@ -1213,10 +1398,8 @@ from collections import defaultdict
 
 @api_view(['POST'])
 def soldTicketsForEvent(request):
-   
     user = request.user
     data = request.data.copy()
-    print(data)
     event_uuid = data['event_uuid']
     tipo = data['event_type']
     tipo_tickets = data['tickets_type']
@@ -1270,12 +1453,9 @@ def soldTicketsForEvent(request):
 
 @api_view(['POST'])
 def updateEntrada(request):
-
     user = request.user
     if not user.is_authenticated:
         return Response('User not authenticated', status=401)
-        
-
     data = request.data.copy()
 
     entrada_uuid= data['uuid']
@@ -1310,7 +1490,6 @@ def updateEntrada(request):
 @api_view(['POST'])
 def updateReserva(request):
     user = request.user
-
     if not user.is_authenticated:
         return Response('User not authenticated', status=401)
         
@@ -1343,12 +1522,6 @@ def updateReserva(request):
     reserva.campos.set(campos)
     reserva.save()
     porcentaje = (reserva.confirmados / reserva.max_disponibilidad )* 100
-
-    print('porcentaje')
-    print(round(porcentaje, 2))
-
-
-
     return Response({ "max_disponibilidad": reserva.max_disponibilidad, "porcentaje_reservados": round(porcentaje, 2)} ,status = 200)
   
 
@@ -1422,8 +1595,6 @@ def templates(request):
                 return Response('There are no templates created by this user', status = 200)
             
             serializer = EventTemplateSerializer(templates, many=True)
-
-            
         
         elif template_uuid:
             try:
@@ -1449,6 +1620,7 @@ def templates(request):
             values = json.loads(data['values']),
             creador = user 
         )
+        template.save()
 
         return Response(status = 200)
 
@@ -1466,8 +1638,6 @@ def updateReservaStatus(request):
     except Reserva.DoesNotExist:
         return Response('Such Reserva does not exist', status = 400)
 
-    print(type(data['reserva_status']))
-    print(data['reserva_status'])
     reserva.estado = int(data['reserva_status'])
     reserva.save()
 
@@ -1481,8 +1651,6 @@ def updateActiveStatus(request):
         return Response('User not authenticated', status=401)
 
     data = request.data.copy()
-    print('data')
-    print(data)
     if data['tipo'] == 0: #activity
         try:
             evento = Activity.objects.get(uuid = data['uuid'])
@@ -1503,7 +1671,6 @@ def updateActiveStatus(request):
 
 
     active_status_previo = evento.active
-
     evento.active = not active_status_previo
     evento.save()
 
@@ -1531,10 +1698,6 @@ def export_to_excel(request):
     ws["A1"] = "Detalles de los movimientos de "+mes_resumen
     ws.merge_cells("A2:G2")
     ws['A2'] = 'm'
-
-
-    
-
     # Escribir encabezados
     ws.append(["ID", "Usuario", "Monto", "Fecha"])
 
@@ -1550,6 +1713,8 @@ def export_to_excel(request):
     response["Content-Disposition"] = 'attachment; filename="pagos.xlsx"'
     wb.save(response)
     return response
+
+
 
 
 from decouple import config
@@ -1721,7 +1886,6 @@ def obtainAccessTokenVendedor(request):
         print("Tokens guardados en UserProfile ✅")
     except UserProfile.DoesNotExist:
         
-        print("UserProfile no existe, guardando tokens en archivo...")
         with open("mp_tokens_encrypted.txt", "ab") as f:
             # Guardamos cada usuario en una línea
             f.write(b"user_id: " + str(user_id).encode() + b"\n")
@@ -1737,9 +1901,7 @@ def obtainAccessTokenVendedor(request):
 
 @api_view(['GET'])
 def createSplitPayment(request):
-    print('in createsplit paymente')
     user = request.user
-    print('user: ', user)
     if not user.is_authenticated:
         return Response('User not authenticated', status=401)
 
@@ -1752,15 +1914,8 @@ def createSplitPayment(request):
     if not SECRET_KEY:
         raise Exception("FERNET_KEY no definida en variables de entorno")
     fernet = Fernet(SECRET_KEY)
-
-    print('fernet obtenido: ', fernet)
-
-
-
     encrypted_access_token = userProfile.mp_access_token  # bytes
-    print('encrypted: ', encrypted_access_token)
     access_token = fernet.decrypt(encrypted_access_token.encode()).decode()
-    print('access_token: ', access_token)
     url = "https://api.mercadopago.com/checkout/preferences"
     
     payload = {
@@ -1789,19 +1944,33 @@ def createSplitPayment(request):
         "marketplace": "goLocalmp",
         "marketplace_fee": 10.0  # comisión de la app en ARS
     }
-
-    print('payload: ', payload)
-
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
 
     resp = requests.post(url, json=payload, headers=headers)
-
-    print('resp: ', resp.json())
     return Response(resp.json(), status = 200)
 
+
+
+@api_view(['GET'])
+def eventosActivos(request):
+    user = request.user
+
+    if not user.is_authenticated:
+        return Response('User not authenticated', status=401)
+
+    if not user.profile.creador:
+        return Response('No eres creador, no tienes acceso', status = 403)
     
+    today = timezone.localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
+    print('today')
+    print(today)
+    eventos = Activity.objects.filter(creador=user, startDateandtime__gte = today, gratis = False, control_entradas=True,entradas_for_plan__isnull = False)
+    print('eventos')
+    serializer = ActivitySerializerForGoLocalQR(eventos, many=True)
+    print(serializer)
+    return Response(serializer.data,status = 200)
 
 

@@ -97,6 +97,30 @@ class ActivitySerializer(DynamicFieldsModelSerializer):
     
     def get_disponibilidad_creacion(self, obj):
         return True
+    
+from django.db.models import Sum
+class ActivitySerializerForGoLocalQR(serializers.ModelSerializer):
+    disponibles = serializers.SerializerMethodField()
+    vendidas = serializers.SerializerMethodField()
+    asistidos = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Activity
+        fields = ['uuid', 'name', 'startDateandtime', 'disponibles', 'vendidas', 'asistidos']
+
+    def get_disponibles(self, obj):
+        # Suma de max_disponibilidad de todas las entradas asociadas
+        return obj.entradas_for_plan.aggregate(total=Sum('maxima_disponibilidad'))['total'] or 0
+
+    def get_vendidas(self, obj):
+        # Contar tickets asociados a todas las entradas de la actividad
+        return Ticket.objects.filter(entrada__activity=obj).count()
+
+    def get_asistidos(self, obj):
+        # Contar tickets con status=1 asociados a todas las entradas de la actividad
+        return Ticket.objects.filter(entrada__activity=obj, status=1).count()
+    
+
 class PromoSerializer(DynamicFieldsModelSerializer):
 
     place_name = serializers.CharField(source='place.name', read_only=True)
@@ -139,7 +163,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields ='__all__'
+        fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'available_planes_gratis', 'payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual']
 
     def to_representation(self, instance):
         # Aseguramos pasar el contexto con request

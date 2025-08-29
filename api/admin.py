@@ -41,7 +41,7 @@ admin.site.register(Tag)
 
 @admin.register(Ticket)
 class TicketAdmin(admin.ModelAdmin):
-    list_display = ('entrada__titulo','entrada__activity__name', 'user_profile__user__username','fecha_compra')
+    list_display = ('entrada__titulo','entrada__activity__name', 'user_profile__user__username','fecha_compra', 'status')
 
 admin.site.register(Reserva)
 @admin.register(CampoReserva)

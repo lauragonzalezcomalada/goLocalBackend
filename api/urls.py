@@ -1,7 +1,7 @@
 from django.urls import path
 
 from api.serializers import CampoReservaSerializer
-from .views import (ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_payment, create_ticket, createSplitPayment, entradasForUserAdmin, export_to_excel, extendPlanWebHook, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, tags, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketsLink, user_profile,sign_in,
+from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_payment, create_ticket, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, extendPlanWebHook, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, tags, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketsLink, user_profile,sign_in,
                     google_sign_in,updateActivityAssistance,update_user,promos,create_event,user_prorfile_from_uuid,search_users,update_item_details, userCreatedEventsForTheWeek, validate_ticket,soldTicketsForEvent, templates)
 from django.conf import settings
 from django.conf.urls.static import static
@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import (TokenObtainPairView,TokenRefreshView
 
 urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/creador/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair_creador'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('hello/', hello_world),
     path('places/', get_all_places, name='place-list'), 
@@ -32,8 +33,6 @@ urlpatterns = [
     path('validate_ticket/', validate_ticket, name='validate_ticket'),
     path('create_tickets/', create_ticket, name='create_ticket'),
     path('get_tickets/', get_tickets, name="get_tickets"),
-    
-
 
     ##Aquí aniran les calls només pel goLocalWeb
     path('events_for_the_week/', userCreatedEventsForTheWeek, name="userCreatedEventsForTheWeek"),
@@ -52,15 +51,19 @@ urlpatterns = [
     path('bonos/', bonos, name="bonos"),
     path('payment_events_ranges/', paymentEventsRanges, name="paymentEventsRanges"),
     path('export-pagos-excel/', export_to_excel, name="export_to_excel"),
+    path('register_view/', registerView, name="registerView"),
+    path('register_share/', registerShare, name="registerShare"),
 
     #mercadopago
     path('create_test_payment/', create_payment, name="export_to_excel"),
     path('webhook/extend_plan/', extendPlanWebHook, name="extendPlanWebHook"),
     path('generate_oauth_mp_link/', generateOauthMpLink, name="generate_oauth_mp_link"),
     path('success_oauth_registration/', obtainAccessTokenVendedor, name="getAccessTokenVendedor"),
-    path('create_split_payment/', createSplitPayment, name="createSplitPayment")
+    path('create_split_payment/', createSplitPayment, name="createSplitPayment"),
 
+    #goLocalQR
+    path('eventos_activos/', eventosActivos, name="eventos_activos"),
 
-
+    
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
