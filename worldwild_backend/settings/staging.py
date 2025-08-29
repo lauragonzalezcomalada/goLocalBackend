@@ -1,17 +1,12 @@
 from .base import *
 import dj_database_url
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL")
-    )
-}
 
 DATABASES = {
     'default': dj_database_url.config(default='postgresql://golocalbackend_staging_user:vFySJwYrgST8yKCIlqbxiecHVOvpJ0VB@dpg-d2osaqripnbc73a6onpg-a/golocalbackend_staging')
 }
 
-
+ROOT_URLCONF = "worldwild_backend.urls"
 
 DEBUG = False
 ALLOWED_HOSTS = ["https://golocalbackend.onrender.com"]
