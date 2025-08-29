@@ -42,3 +42,4 @@ zopfli==0.2.3.post1
 psycopg2-binary
 django
 python-dotenv
+dj-database-url
