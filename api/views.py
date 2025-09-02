@@ -106,7 +106,7 @@ def activities(request): #hacer doble view
             activities = Activity.objects.filter(startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
             if not activities.exists:
                 return Response({'error': 'No activities found'}, status=404)   
-            serializer = ActivitySerializer(activities, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'], context={'request': request})     
+            serializer = ActivitySerializer(activities, many=True) #, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'], context={'request': request})     
             return Response(serializer.data)
             #return Response({'error':'Neither place or activity submitted'},status=404)
     
