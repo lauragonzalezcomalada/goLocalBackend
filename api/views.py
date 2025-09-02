@@ -77,24 +77,24 @@ def place_detail(request):
 @api_view(['GET'])
 def activities(request): #hacer doble view
     if request.method == 'GET':
-        place_uuid = request.query_params.get('place_uuid',None)
+       # place_uuid = request.query_params.get('place_uuid',None)
         activity_uuid = request.query_params.get('activity_uuid',None)
 
-        if place_uuid:
-            try:
-                place = Place.objects.get(uuid=place_uuid)
-            except Place.DoesNotExist:
-                return Response({'error': 'No place found according to your uuid'}, status=404)
+      # if place_uuid:
+      #      try:
+      #          place = Place.objects.get(uuid=place_uuid)
+      #      except Place.DoesNotExist:
+      #          return Response({'error': 'No place found according to your uuid'}, status=404)
                     
-            activities = Activity.objects.filter(place__uuid=place_uuid,startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
-            print(activities)
+      #      activities = Activity.objects.filter(place__uuid=place_uuid,startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
+      #      print(activities)
             
-            if not activities.exists:
-                return Response({'error': 'No activities found according to the submitted place'}, status=404)
+       #     if not activities.exists:
+       #         return Response({'error': 'No activities found according to the submitted place'}, status=404)
 
-            serializer = ActivitySerializer(activities, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'])
-            return Response(serializer.data)
-        elif activity_uuid:
+      #      serializer = ActivitySerializer(activities, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'])
+      #      return Response(serializer.data)
+        if activity_uuid:
                 try: 
                     activity = Activity.objects.get(uuid=activity_uuid)
                 except Activity.DoesNotExist:
@@ -103,7 +103,12 @@ def activities(request): #hacer doble view
                 serializer = ActivitySerializer(activity,context={'request': request})
                 return Response(serializer.data)
         else:
-            return Response({'error':'Neither place or activity submitted'},status=404)
+            activities = Activity.objects.filter(startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
+            if not activities.exists:
+                return Response({'error': 'No activities found'}, status=404)   
+            serializer = ActivitySerializer(activities, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'], context={'request': request})     
+            return Response(serializer.data)
+            #return Response({'error':'Neither place or activity submitted'},status=404)
     
         
     
@@ -397,8 +402,6 @@ def create_ticket(request):
 
 @api_view(['GET'])
 def user_profile(request):
-
-    print(request.user)
 
     if not request.user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=404)
