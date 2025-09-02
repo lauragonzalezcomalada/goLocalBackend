@@ -22,12 +22,13 @@ MEDIA_URL = '/media/'
 
 ROOT_URLCONF = "worldwild_backend.urls"
 
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ['golocalbackend.onrender.com','127.0.0.1']
 
 # Logs en consola para revisar staging
 LOGGING = {
     "version": 1,
+    "disable_existing_loggers": False,
     "handlers": {
         "console": {"class": "logging.StreamHandler"},
     },
