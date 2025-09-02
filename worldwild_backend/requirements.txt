@@ -1,4 +1,3 @@
-altgraph @ file:///AppleInternal/Library/BuildRoots/39d9dc1a-2111-11f0-be06-226177e5bb69/Library/Caches/com.apple.xbs/Sources/python3/altgraph-0.17.2-py2.py3-none-any.whl
 asgiref==3.9.1
 Brotli==1.1.0
 certifi==2025.7.9
@@ -17,12 +16,11 @@ djangorestframework_simplejwt==5.5.0
 djoser==2.3.1
 et_xmlfile==2.0.0
 fonttools==4.59.1
-future @ file:///AppleInternal/Library/BuildRoots/39d9dc1a-2111-11f0-be06-226177e5bb69/Library/Caches/com.apple.xbs/Sources/python3/future-0.18.2-py3-none-any.whl
+future==0.18.2
 geographiclib==2.0
 geopy==2.4.1
 gunicorn==23.0.0
 idna==3.10
-macholib @ file:///AppleInternal/Library/BuildRoots/39d9dc1a-2111-11f0-be06-226177e5bb69/Library/Caches/com.apple.xbs/Sources/python3/macholib-1.15.2-py2.py3-none-any.whl
 mercadopago==2.3.0
 oauthlib==3.3.1
 openpyxl==3.1.5
@@ -40,7 +38,6 @@ qrcode==8.2
 reportlab==4.4.3
 requests==2.32.4
 requests-oauthlib==2.0.0
-six @ file:///AppleInternal/Library/BuildRoots/39d9dc1a-2111-11f0-be06-226177e5bb69/Library/Caches/com.apple.xbs/Sources/python3/six-1.15.0-py2.py3-none-any.whl
 social-auth-app-django==5.4.3
 social-auth-core==4.7.0
 sqlparse==0.5.3
