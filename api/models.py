@@ -9,6 +9,7 @@ import qrcode
 from io import BytesIO
 from django.core.files.base import ContentFile
 from django.utils import timezone
+from cloudinary.models import CloudinaryField as ImageField
 
 
 # Create your models here.
