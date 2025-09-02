@@ -18,6 +18,7 @@ from cloudinary.models import CloudinaryField as ImageField
 class Place(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     name = models.CharField(max_length=110)
+    name2 = models.CharField(max_length=110, null=True, blank=True)
     desc = models.CharField(max_length = 256)
     latitude = models.FloatField()
     longitude = models.FloatField()
