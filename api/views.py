@@ -1977,3 +1977,17 @@ def eventosActivos(request):
     return Response(serializer.data,status = 200)
 
 
+@api_view(['POST', 'GET'])
+def successMP(request):
+    print('request body:', request.body)
+    return Response({"message": "Success"}, status=200)
+
+@api_view(['POST', 'GET'])
+def failureMP(request):
+    print('request body:', request.body)
+    return Response({"message": "Failure"}, status=200)
+
+@api_view(['POST', 'GET'])
+def pendingMP(request):
+    print('request body:', request.body)
+    return Response({"message": "Pending"}, status=200)
