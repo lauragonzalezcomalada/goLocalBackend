@@ -968,7 +968,6 @@ def create_event(request):
             if  data['gratis'] ==  True:
                 if(data['reserva_necesaria'] == True):    
                     reservas_list = json.loads(data['reservas'])
-                   
                     for reserva in reservas_list:
                         tipo = reserva.get('tipoReserva', '')
                         cantidad = int(reserva.get('cantidad', 0))
@@ -981,7 +980,7 @@ def create_event(request):
                         if tipoEvento == 0:
                             reserva_instance = ReservaForm.objects.create(
                                 nombre=tipo,
-                                actividad=event,
+                                activity=event,
                                 max_disponibilidad=cantidad
                             )
                         elif tipoEvento == 1:

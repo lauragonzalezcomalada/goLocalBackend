@@ -60,6 +60,7 @@ admin.site.register(Reserva)
 class CampoReservaAdmin(admin.ModelAdmin):
     list_display = ('label','nombre')
 
+@admin.register(ReservaForm)
 class ReservaFormAdmin(admin.ModelAdmin):
     list_display = ('id', 'activity_name', 'promo_name')
 
@@ -75,6 +76,8 @@ class ReservaFormAdmin(admin.ModelAdmin):
 admin.site.register(EventTemplate)
 admin.site.register(Bono)
 admin.site.register(PaymentForUse)
+
+
 @admin.register(PaymentEventsRanges)
 class PaymentEventsRangesAdmin(admin.ModelAdmin):
     list_display = ('name','start_range','end_range')    
