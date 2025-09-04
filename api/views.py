@@ -897,7 +897,7 @@ def create_event(request):
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=401)
 
-    data = request.data   
+    data = request.data.copy()   
     print(data)
     lat = float(data['lat'])
     lng = float(data['lng'])
