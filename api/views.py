@@ -456,6 +456,7 @@ def billingStatus(request):
         return Response(400)
     
     first_date, last_date = get_month_bounds()
+    print('month bounds: ', first_date, last_date)
 
     activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date))
     promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date))
@@ -475,10 +476,13 @@ def billingStatus(request):
     #eventos_sin_centralizar = []
     
     eventos_gratuitos = eventos_gratuitos + promos.count() #S'inicialitza amb la quantitat de promos, que sempre són gratis
+    print('eventos_ gratius de promos: ', eventos_gratuitos)
     for evento in activities:
-        if evento.gratis == True:
+        if evento.gratis == True and evento.active== True: #Eventos gratuitos
+            print('evento gratuito: ', evento.name)
+            print('evento gratuitos: ', evento.startDateandtime)
             eventos_gratuitos += 1
-        else: #Eventos de pago:
+        elif evento.active== True: #Eventos de pago:
             eventos_pagos += 1
        # elif evento.control_entradas == True:
        #     eventos_centralizados += 1
@@ -486,35 +490,44 @@ def billingStatus(request):
        #     eventos_sin_centralizar.append(evento)
 
     # Mostrar el tramo de los planes pagos centralizados
+    print('eventos_ gratius: ', eventos_gratuitos)
 
     
         #0 a 12 --> 20.000ARS
         #13 a 18 --> 40.000ARS
         #19 a 24 --> 60.000ARS
         #+25 --> 75.000ARS
-    centralizado_start_range = None
-    centralizado_end_range = None
-    price_range_centralizados = 0
+    centralizado_start_range = userProfile.payment_events_range.start_range if userProfile.payment_events_range else 1
+    centralizado_end_range = userProfile.payment_events_range.end_range if userProfile.payment_events_range else 4
+    price_range_centralizados = userProfile.payment_events_range.price   if userProfile.payment_events_range else None 
 
-    if eventos_pagos < 5 :
-        centralizado_end_range = 4
-        price_range_centralizados = 20000
-    elif eventos_pagos < 9:
-        centralizado_start_range = 5
-        centralizado_end_range = 8
-        price_range_centralizados = 35000
-    elif eventos_pagos < 13:
-        centralizado_start_range = 9
-        centralizado_end_range = 12
-        price_range_centralizados = 50000
-    elif eventos_pagos < 19:
-        centralizado_start_range = 13
-        centralizado_end_range = 18
-        price_range_centralizados = 65000
-    else:
-        centralizado_start_range = 17
-        centralizado_end_range = None
-        price_range_centralizados = 100000
+    #ranges = PaymentEventsRanges.objects.all().order_by('start_range')
+    #print('ranges: ', ranges)
+
+    #for range in ranges:
+    #    if eventos_pagos >= range.start_range and (eventos_pagos <= range.end_range or range.end_range is None):
+    #        centralizado_start_range = range.start_range
+    #        centralizado_end_range = range.end_range
+    #        price_range_centralizados = range.price
+    #if eventos_pagos < 5 :
+    #    centralizado_end_range = 4
+    #    price_range_centralizados = 20000
+    #elif eventos_pagos < 9:
+    #    centralizado_start_range = 5
+    #    centralizado_end_range = 8
+    #    price_range_centralizados = 35000
+    #elif eventos_pagos < 13:
+    #    centralizado_start_range = 9
+    #    centralizado_end_range = 12
+    #    price_range_centralizados = 50000
+    #elif eventos_pagos < 19:
+    #    centralizado_start_range = 13
+    #    centralizado_end_range = 18
+    #    price_range_centralizados = 65000
+    #else:
+    #    centralizado_start_range = 17
+    #    centralizado_end_range = None
+    #    price_range_centralizados = 100000
 
     # Agrupamos sin centralizar por rangos de precios
    # price_ranges = {
@@ -607,6 +620,7 @@ def get_month_bounds():
 def ableToTurnVisible(request):
 
     print('able to turn visible')
+    print(request.data)
     user = request.user
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=404)
@@ -623,8 +637,8 @@ def ableToTurnVisible(request):
         print('free event')
         available_free_plans_fromUP = userProfile.available_planes_gratis # valor máximo que tiene para el mes
         print('available free plans stored in UP:', available_free_plans_fromUP)
-        activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date), gratis = True)
-        promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date))
+        activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date), gratis = True, active = True)
+        promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date), active = True)
 
         created_free_events = activities.count() + promos.count()
         print('created_free_events: ', created_free_events)
@@ -636,7 +650,7 @@ def ableToTurnVisible(request):
         print('status: ', status)
     else: #Planes pagos
         print('payment event')
-        activities = Activity.objects.filter(creador=user, startDateandtime__date__range=(first_date, last_date), gratis = False)
+        activities = Activity.objects.filter(creador=user, startDateandtime__date__range=(first_date, last_date), gratis = False, active = True)
         print('end_range: ',userProfile.payment_events_range.end_range)
         print('amount of activities: ', activities.count())
         status = activities.count() < userProfile.payment_events_range.end_range
