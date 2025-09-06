@@ -9,6 +9,7 @@ import qrcode
 from io import BytesIO
 from django.core.files.base import ContentFile
 from django.utils import timezone
+from cloudinary.models import CloudinaryField as ImageField
 
 
 # Create your models here.
@@ -16,7 +17,7 @@ from django.utils import timezone
 
 class Place(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True)
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=110)
     desc = models.CharField(max_length = 256)
     latitude = models.FloatField()
     longitude = models.FloatField()

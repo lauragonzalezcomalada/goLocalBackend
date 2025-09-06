@@ -126,7 +126,8 @@ class PromoSerializer(DynamicFieldsModelSerializer):
     place_name = serializers.CharField(source='place.name', read_only=True)
     image = serializers.ImageField(required=False, allow_null=True)
     tag_detail = TagSerializer(required=False, many=True,read_only=True, source='tags') #para el GET, que se muestra todo el Tag
-
+    reservas_forms = ReservasFormsSerializer(many=True, read_only = True)
+    user_isgoing = serializers.SerializerMethodField()
     creador_image = serializers.SerializerMethodField()
     created_by_user = serializers.SerializerMethodField()
 
@@ -145,6 +146,16 @@ class PromoSerializer(DynamicFieldsModelSerializer):
         request = self.context.get('request', None)
         if request and hasattr(request, 'user'):
             return obj.creador == request.user
+        return False
+    
+    def get_user_isgoing(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            try:
+                user_profile = request.user.profile
+                return obj in user_profile.promos.all()
+            except UserProfile.DoesNotExist:
+                return False
         return False
 
 

@@ -77,24 +77,24 @@ def place_detail(request):
 @api_view(['GET'])
 def activities(request): #hacer doble view
     if request.method == 'GET':
-        place_uuid = request.query_params.get('place_uuid',None)
+       # place_uuid = request.query_params.get('place_uuid',None)
         activity_uuid = request.query_params.get('activity_uuid',None)
 
-        if place_uuid:
-            try:
-                place = Place.objects.get(uuid=place_uuid)
-            except Place.DoesNotExist:
-                return Response({'error': 'No place found according to your uuid'}, status=404)
+      # if place_uuid:
+      #      try:
+      #          place = Place.objects.get(uuid=place_uuid)
+      #      except Place.DoesNotExist:
+      #          return Response({'error': 'No place found according to your uuid'}, status=404)
                     
-            activities = Activity.objects.filter(place__uuid=place_uuid,startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
-            print(activities)
+      #      activities = Activity.objects.filter(place__uuid=place_uuid,startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
+      #      print(activities)
             
-            if not activities.exists:
-                return Response({'error': 'No activities found according to the submitted place'}, status=404)
+       #     if not activities.exists:
+       #         return Response({'error': 'No activities found according to the submitted place'}, status=404)
 
-            serializer = ActivitySerializer(activities, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'])
-            return Response(serializer.data)
-        elif activity_uuid:
+      #      serializer = ActivitySerializer(activities, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'])
+      #      return Response(serializer.data)
+        if activity_uuid:
                 try: 
                     activity = Activity.objects.get(uuid=activity_uuid)
                 except Activity.DoesNotExist:
@@ -103,7 +103,12 @@ def activities(request): #hacer doble view
                 serializer = ActivitySerializer(activity,context={'request': request})
                 return Response(serializer.data)
         else:
-            return Response({'error':'Neither place or activity submitted'},status=404)
+            activities = Activity.objects.filter(startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
+            if not activities.exists:
+                return Response({'error': 'No activities found'}, status=404)   
+            serializer = ActivitySerializer(activities, many=True) #, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'], context={'request': request})     
+            return Response(serializer.data)
+            #return Response({'error':'Neither place or activity submitted'},status=404)
     
         
     
@@ -300,9 +305,9 @@ def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code):
         Spacer(1, 5*mm), 
         Paragraph(f"Comprador: {buyer_name}", normal_style),
         Spacer(1, 5*mm), 
-        Paragraph(f"Fecha: {timezone.localtime(event_time).strftime("%d/%m/%Y")}", normal_style),
+        Paragraph(f"Fecha: {timezone.localtime(event_time).strftime('%d/%m/%Y')}", normal_style),
         Spacer(1, 3*mm), 
-        Paragraph(f"Hora: {timezone.localtime(event_time).strftime("%H:%M")}", normal_style),
+        Paragraph(f"Hora: {timezone.localtime(event_time).strftime('%H:%M')}", normal_style),
 
     ]
 
@@ -398,8 +403,6 @@ def create_ticket(request):
 @api_view(['GET'])
 def user_profile(request):
 
-    print(request.user)
-
     if not request.user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=404)
     
@@ -453,6 +456,7 @@ def billingStatus(request):
         return Response(400)
     
     first_date, last_date = get_month_bounds()
+    print('month bounds: ', first_date, last_date)
 
     activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date))
     promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date))
@@ -472,10 +476,13 @@ def billingStatus(request):
     #eventos_sin_centralizar = []
     
     eventos_gratuitos = eventos_gratuitos + promos.count() #S'inicialitza amb la quantitat de promos, que sempre són gratis
+    print('eventos_ gratius de promos: ', eventos_gratuitos)
     for evento in activities:
-        if evento.gratis == True:
+        if evento.gratis == True and evento.active== True: #Eventos gratuitos
+            print('evento gratuito: ', evento.name)
+            print('evento gratuitos: ', evento.startDateandtime)
             eventos_gratuitos += 1
-        else: #Eventos de pago:
+        elif evento.active== True: #Eventos de pago:
             eventos_pagos += 1
        # elif evento.control_entradas == True:
        #     eventos_centralizados += 1
@@ -483,35 +490,44 @@ def billingStatus(request):
        #     eventos_sin_centralizar.append(evento)
 
     # Mostrar el tramo de los planes pagos centralizados
+    print('eventos_ gratius: ', eventos_gratuitos)
 
     
         #0 a 12 --> 20.000ARS
         #13 a 18 --> 40.000ARS
         #19 a 24 --> 60.000ARS
         #+25 --> 75.000ARS
-    centralizado_start_range = None
-    centralizado_end_range = None
-    price_range_centralizados = 0
+    centralizado_start_range = userProfile.payment_events_range.start_range if userProfile.payment_events_range else 1
+    centralizado_end_range = userProfile.payment_events_range.end_range if userProfile.payment_events_range else 4
+    price_range_centralizados = userProfile.payment_events_range.price   if userProfile.payment_events_range else None 
 
-    if eventos_pagos < 5 :
-        centralizado_end_range = 4
-        price_range_centralizados = 20000
-    elif eventos_pagos < 9:
-        centralizado_start_range = 5
-        centralizado_end_range = 8
-        price_range_centralizados = 35000
-    elif eventos_pagos < 13:
-        centralizado_start_range = 9
-        centralizado_end_range = 12
-        price_range_centralizados = 50000
-    elif eventos_pagos < 19:
-        centralizado_start_range = 13
-        centralizado_end_range = 18
-        price_range_centralizados = 65000
-    else:
-        centralizado_start_range = 17
-        centralizado_end_range = None
-        price_range_centralizados = 100000
+    #ranges = PaymentEventsRanges.objects.all().order_by('start_range')
+    #print('ranges: ', ranges)
+
+    #for range in ranges:
+    #    if eventos_pagos >= range.start_range and (eventos_pagos <= range.end_range or range.end_range is None):
+    #        centralizado_start_range = range.start_range
+    #        centralizado_end_range = range.end_range
+    #        price_range_centralizados = range.price
+    #if eventos_pagos < 5 :
+    #    centralizado_end_range = 4
+    #    price_range_centralizados = 20000
+    #elif eventos_pagos < 9:
+    #    centralizado_start_range = 5
+    #    centralizado_end_range = 8
+    #    price_range_centralizados = 35000
+    #elif eventos_pagos < 13:
+    #    centralizado_start_range = 9
+    #    centralizado_end_range = 12
+    #    price_range_centralizados = 50000
+    #elif eventos_pagos < 19:
+    #    centralizado_start_range = 13
+    #    centralizado_end_range = 18
+    #    price_range_centralizados = 65000
+    #else:
+    #    centralizado_start_range = 17
+    #    centralizado_end_range = None
+    #    price_range_centralizados = 100000
 
     # Agrupamos sin centralizar por rangos de precios
    # price_ranges = {
@@ -604,6 +620,7 @@ def get_month_bounds():
 def ableToTurnVisible(request):
 
     print('able to turn visible')
+    print(request.data)
     user = request.user
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=404)
@@ -620,8 +637,8 @@ def ableToTurnVisible(request):
         print('free event')
         available_free_plans_fromUP = userProfile.available_planes_gratis # valor máximo que tiene para el mes
         print('available free plans stored in UP:', available_free_plans_fromUP)
-        activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date), gratis = True)
-        promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date))
+        activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date), gratis = True, active = True)
+        promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date), active = True)
 
         created_free_events = activities.count() + promos.count()
         print('created_free_events: ', created_free_events)
@@ -633,7 +650,7 @@ def ableToTurnVisible(request):
         print('status: ', status)
     else: #Planes pagos
         print('payment event')
-        activities = Activity.objects.filter(creador=user, startDateandtime__date__range=(first_date, last_date), gratis = False)
+        activities = Activity.objects.filter(creador=user, startDateandtime__date__range=(first_date, last_date), gratis = False, active = True)
         print('end_range: ',userProfile.payment_events_range.end_range)
         print('amount of activities: ', activities.count())
         status = activities.count() < userProfile.payment_events_range.end_range
@@ -894,7 +911,7 @@ def create_event(request):
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=401)
 
-    data = request.data   
+    data = request.data.copy()   
     print(data)
     lat = float(data['lat'])
     lng = float(data['lng'])
@@ -965,7 +982,6 @@ def create_event(request):
             if  data['gratis'] ==  True:
                 if(data['reserva_necesaria'] == True):    
                     reservas_list = json.loads(data['reservas'])
-                   
                     for reserva in reservas_list:
                         tipo = reserva.get('tipoReserva', '')
                         cantidad = int(reserva.get('cantidad', 0))
@@ -978,7 +994,7 @@ def create_event(request):
                         if tipoEvento == 0:
                             reserva_instance = ReservaForm.objects.create(
                                 nombre=tipo,
-                                actividad=event,
+                                activity=event,
                                 max_disponibilidad=cantidad
                             )
                         elif tipoEvento == 1:
@@ -1974,3 +1990,17 @@ def eventosActivos(request):
     return Response(serializer.data,status = 200)
 
 
+@api_view(['POST', 'GET'])
+def successMP(request):
+    print('request body:', request.body)
+    return Response({"message": "Success"}, status=200)
+
+@api_view(['POST', 'GET'])
+def failureMP(request):
+    print('request body:', request.body)
+    return Response({"message": "Failure"}, status=200)
+
+@api_view(['POST', 'GET'])
+def pendingMP(request):
+    print('request body:', request.body)
+    return Response({"message": "Pending"}, status=200)
