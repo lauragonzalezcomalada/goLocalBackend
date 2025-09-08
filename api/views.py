@@ -1029,6 +1029,8 @@ def create_event(request):
         event.creador = user
         event.save()
         return Response({'uuid':event.uuid}, status=201)
+    else:
+        print('serializer errors:', serializer.errors)
     return Response(serializer.errors, status=400)
 
 

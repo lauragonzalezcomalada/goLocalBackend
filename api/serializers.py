@@ -254,7 +254,7 @@ class ItemSerializer(serializers.ModelSerializer):
 
 
 class PrivatePlanSerializer(DynamicFieldsModelSerializer):
-    invited_users = UserProfileBasicSerializer(many = True)
+    invited_users = UserProfileBasicSerializer(many = True, required=False)
     image = serializers.ImageField(required=False, allow_null=True)
     place_name = serializers.CharField(source='place.name', read_only=True)
     creador_image = serializers.SerializerMethodField()

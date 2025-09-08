@@ -114,7 +114,7 @@ class PrivatePlan(models.Model):
     reserva_necesaria =  models.BooleanField(default=True)
     price = models.FloatField(default = 0.0)
     invitation_code = models.CharField(max_length=8, unique=True, blank=True, null=True)
-    invited_users = models.ManyToManyField('UserProfile', through='PrivatePlanInvitation', related_name='planes_invitados', blank=True)
+    invited_users = models.ManyToManyField('UserProfile', through='PrivatePlanInvitation', related_name='planes_invitados', blank=True, null = True)
     active = models.BooleanField(default=False)
 
 
