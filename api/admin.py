@@ -1,9 +1,7 @@
 from django import forms
 from django.contrib import admin
-from django.contrib.contenttypes.models import ContentType
-
 # Register your models here.
-from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, PaymentEventsRanges, PaymentForUse, Place,Activity, PrivatePlan, PrivatePlanInvitation, Reserva, ReservaForm,Tag, Ticket,UserProfile,Promo,ItemPlan
+from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, Order, Payment, PaymentEventsRanges, Place,Activity, PrivatePlan, PrivatePlanInvitation, Reserva, ReservaForm,Tag, Ticket,UserProfile,Promo,ItemPlan
 
 
 class UserProfileAdmin(admin.ModelAdmin):
@@ -13,7 +11,7 @@ class UserProfileAdmin(admin.ModelAdmin):
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
     filter_horizontal = ('tags',)  # Esto permite seleccionar múltiples tags de manera más fácil
-    list_display = ['name','creador','startDateandtime','gratis']
+    list_display = ['name','creador','startDateandtime','gratis','active']
 
 
 class PromoAdmin(admin.ModelAdmin):
@@ -75,7 +73,10 @@ class ReservaFormAdmin(admin.ModelAdmin):
 
 admin.site.register(EventTemplate)
 admin.site.register(Bono)
-admin.site.register(PaymentForUse)
+admin.site.register(Payment)
+admin.site.register(Order)
+
+
 
 
 @admin.register(PaymentEventsRanges)

@@ -3,10 +3,11 @@ from geopy.distance import geodesic
 from collections import defaultdict,OrderedDict
 import json
 # Create your views here.
+import mercadopago
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Activity, Bono, CampoReserva, EntradasForPlan, EventTemplate, ItemPlan, PaymentEventsRanges, PaymentForUse, Place, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm, Tag, Ticket, UserProfile, User
+from .models import Activity, Bono, CampoReserva, EntradasForPlan, EventTemplate, ItemPlan, Order, Payment, PaymentEventsRanges, Place, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm, Tag, Ticket, UserProfile, User
 from .serializers import ActivitySerializer, ActivitySerializerForGoLocalQR, BonoSerializer, CampoReservaSerializer, EventTemplateSerializer, ItemSerializer, PaymentEventsRangesSerializer, PlaceSerializer, PrivatePlanSerializer, PromoSerializer, ReservaFormSerializer, ReservaSerializer, TagSerializer, TicketSerializer, UserProfileBasicSerializer,UserProfileSerializer
 import ast 
 from datetime import datetime, timedelta, date
@@ -461,14 +462,14 @@ def billingStatus(request):
     activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date))
     promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date))
 
-    paymentReceipt = PaymentForUse.objects.filter(userProfile__user = user, payment_month__date__range = (first_date, last_date))
+    #paymentReceipt = PaymentForUse.objects.filter(userProfile__user = user, payment_month__date__range = (first_date, last_date))
     
     
-    print('pyament receipt')
-    if paymentReceipt.exists():
-        paymentStatus = 'Pagado'
-    else:
-        paymentStatus = 'Pendiente de pago'
+    #print('pyament receipt')
+    #if paymentReceipt.exists():
+    #    paymentStatus = 'Pagado'
+    #else:
+    #    paymentStatus = 'Pendiente de pago'
     #eventos = list(chain(activities, promos))
     
     eventos_gratuitos = 0
@@ -599,7 +600,7 @@ def billingStatus(request):
       #  "sin_centralizar_costos":price_ranges_costos_totales,
       #  "sin_centralizar_costos_por_rango" : price_range_costos,
         "precio_total":total_goLocal_mensual,
-        "estado":paymentStatus
+        "estado":'Pagado'
 
     }, status = 200)
 
@@ -664,7 +665,7 @@ def ableToTurnVisible(request):
 def bonos(request):
   
     try:
-        bonos = Bono.objects.all()
+        bonos = Bono.objects.all().order_by('price')
     except Bono.DoesNotExist:
         return Response('No available bonos at the moment', status = 400)
 
@@ -905,7 +906,6 @@ def updateActivityAssistance(request):
 
 @api_view(['POST'])
 def create_event(request):
-    print('create_event')
     user = request.user
    
     if not user.is_authenticated:
@@ -955,6 +955,8 @@ def create_event(request):
     data['gratis'] = request.data.get('gratis') == 'true' #if request.data.get('gratis') == 'true' == 'True': True; si es 'false' == 'true' --> False
     
     if data['gratis'] == True:
+        print('rserva necearia')
+        print(request.data.get('reserva'))
         data['reserva_necesaria'] = request.data.get('reserva') == 'true'
 
     if (data['gratis'] == False and tipoEvento == 0): #gratis = False i es activity
@@ -1720,9 +1722,9 @@ def export_to_excel(request):
     ws.append(["ID", "Usuario", "Monto", "Fecha"])
 
     # Escribir filas (ejemplo con PaymentForUse)
-    pagos = PaymentForUse.objects.all()
-    for pago in pagos:
-        ws.append([pago.userProfile.user.username, pago.amount, pago.payment_date.strftime("%Y-%m-%d")])
+    #pagos = PaymentForUse.objects.all()
+    #for pago in pagos:
+    #    ws.append([pago.userProfile.user.username, pago.amount, pago.payment_date.strftime("%Y-%m-%d")])
 
     # Respuesta HTTP con el archivo
     response = HttpResponse(
@@ -1744,23 +1746,6 @@ MP_ACCESS_TOKEN= config('MP_ACCESS_TOKEN')
 
 
 
-@api_view(['POST'])
-def extendPlanWebHook(request):
-    data = request.data
-    print("Webhook recibido:", data)
-
-    if "id" in data and data.get("type") == "payment":
-        payment_id = data["id"]
-
-        url = f"https://api.mercadopago.com/v1/payments/{payment_id}"
-        headers = {"Authorization": f"Bearer {MP_ACCESS_TOKEN}"}
-        r = requests.get(url, headers=headers)
-
-        payment_info = r.json()
-        print("Detalle del pago:", payment_info)
-
-        # acá manejás tu lógica (marcar como pagado, generar ticket, etc.)
-    return Response(status=200)
 
 import base64
 import hashlib
@@ -1786,66 +1771,20 @@ def generateOauthMpLink(request):
     auth_url = (
         f"https://auth.mercadopago.com/authorization"
         f"?response_type=code"
-        f"&client_id={APP_ID}"
-        f"&redirect_uri={REDIRECT_URI}"
+        f"&client_id=4728062981588764"
+        #f"&client_id={210936078469229}" #el d'0avui
+        f"&redirect_uri=https://golocalbackend.onrender.com/api/pending/"
         f"&code_challenge={code_challenge}"
         f"&code_challenge_method=S256"
+        f"&login_hint=test_user_3270711302169446228@testuser.com"
     )
 
    
     auth_url += '&state='+ str(request.user.id)
+    print('auth url que me devuelve')
+    print(auth_url)
     return Response({'link':auth_url}, status = 200)
 
-
-
-import requests
-
-@api_view(['POST'])
-def create_payment(request):
-    print('in create payment')
-    user = request.user
-    print('user: ', user)
-    data = request.data.copy()
-    if not user.is_authenticated:
-        return Response('User not authenticated', status=401)
-
-    url = "https://api.mercadopago.com/checkout/preferences"
-    headers = {
-        "Authorization": f"Bearer {MP_ACCESS_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "items": [
-            {
-                "title": data['title'],
-                "quantity": 1,
-                "unit_price": data['amount'],
-                "currency_id": "ARS"
-            }
-        ],
-        "payer": {
-            "name": user.first_name,
-            "surname": user.last_name,
-           # "email":"test_user_1061633649@testuser.com"
-        },
-        "back_urls": {
-            "success": "https://borradoresdeviaje.com/series/series-indonesia.html",
-            "failure": "https://borradoresdeviaje.com/series/series-singapur-malaysia.html",
-            "pending": "https://borradoresdeviaje.com/series/series-cambodia.html"
-        },
-        "auto_return": "all",
-        "notification_url": "http://localhost:8000/api/webhook/extend_plan/"
-       
-    }
-
-    response = requests.post(url, json=payload, headers=headers)
-   
-    print('response: ', response.json())
-
-
-
-    return Response(True)
 
 
 from cryptography.fernet import Fernet
@@ -1854,41 +1793,61 @@ import os
 #url tipo que hit el redirect_url para obtener el accesstoken 
 #https://borradoresdeviaje.com/?code=TG-68a4a2e93b2f1a0001aeee5b-2627047012
 #http://localhost:8000/api/success_oauth_registration/?code=TG-68a4aa6b7020150001abbc9f-2633951459&state=33
+
+
+#AQUESTA ES LA QUE M'HA FUNCIONAT
+#http://localhost:8000/api/success_oauth_registration/?code=TG-68c094d016c07d0001f8ba11-2633951459&state=3
+#http://localhost:8000/api/success_oauth_registration/?code=TG-68c2f3daf5e40700019641e2-2621708065&state=4
+#http://localhost:8000/api/success_oauth_registration/?code=TG-68c74b5eec90b30001007b70-2633951459&state=3
+import requests
+
 @api_view(['GET'])
 def obtainAccessTokenVendedor(request):
     print('objtaint...')
     auth_code = request.GET.get('code')
+    print('auth_code: ', auth_code)
     user_id = request.GET.get('state')
     print('user_id: ', user_id)
+
       # viene de la URL
     with open("pkce_data.txt") as f:
         code_verifier = f.read().strip()
 
-    #resp = requests.post(
-    #    "https://api.mercadopago.com/oauth/token",
-    #    data={
-    #        "grant_type": "authorization_code",
-    #        "client_id": APP_ID,
-    #        "client_secret": APP_SECRET,
-    #        "code": auth_code,
-    #        "redirect_uri": REDIRECT_URI,
-    #        "code_verifier": code_verifier
-    #    }
-    #)
+    resp = requests.post(
+        "https://api.mercadopago.com/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": 4728062981588764,
+            "client_secret": 'ct6urSRBJln4XFSznbVm9Y0yAgUuhOBO',
+            "code": auth_code,
+            "redirect_uri": 'https://golocalbackend.onrender.com/api/pending/',
+            "code_verifier": code_verifier
+        }
 
-    response =  {'access_token': 'APP_USR-2369085495887617-081912-ad216cd1cef5503d9bd07a7dff81907a-2633951459', 
-                 'token_type': 'Bearer', 
-                 'expires_in': 15552000, 
-                 'scope': 'offline_access payments read write', 
-                 'user_id': 2633951459, 
-                 'refresh_token': 'TG-68a4aa9309f7650001b985af-2633951459', 
-                 'public_key': 'APP_USR-3917cb81-ca09-4a7b-971f-1d6161e72f56',
-                    'live_mode': True}
+    )
+
+    print('status code de la resp: ' ,resp.status_code)
+    print('body de la resp: ', resp.text)
+    if resp.status_code != 200:
+        print("Error OAuth:", resp.text)
+        return Response({"error": "No se pudo obtener access token"}, status=400)
+    response = resp.json() 
+
+    #response =  {'access_token': 'APP_USR-2369085495887617-081912-ad216cd1cef5503d9bd07a7dff81907a-2633951459', 
+    #             'token_type': 'Bearer', 
+    #             'expires_in': 15552000, 
+    #             'scope': 'offline_access payments read write', 
+    #             'user_id': 2633951459, 
+    #             'refresh_token': 'TG-68a4aa9309f7650001b985af-2633951459', 
+    #             'public_key': 'APP_USR-3917cb81-ca09-4a7b-971f-1d6161e72f56',
+    #                'live_mode': True}
 
     SECRET_KEY = os.environ.get("FERNET_KEY")
+    print('secret key: ', SECRET_KEY)
     if not SECRET_KEY:
         raise Exception("FERNET_KEY no definida en variables de entorno")
     fernet = Fernet(SECRET_KEY)
+    print('fernet: '   , fernet)
     ##{'access_token': 'APP_USR-2369085495887617-081912-ad216cd1cef5503d9bd07a7dff81907a-2633951459', 'token_type': 'Bearer', 'expires_in': 15552000, 'scope': 'offline_access payments read write', 'user_id': 2633951459, 'refresh_token': 'TG-68a4aa9309f7650001b985af-2633951459', 'public_key': 'APP_USR-3917cb81-ca09-4a7b-971f-1d6161e72f56', 'live_mode': True}
     # ===== Cifrar los tokens =====
     encrypted_access = fernet.encrypt(response['access_token'].encode()).decode()
@@ -1896,7 +1855,7 @@ def obtainAccessTokenVendedor(request):
 
 
     try:
-        userProfile = UserProfile.objects.get(user__id = user_id)
+        userProfile = UserProfile.objects.get(user__id = int(user_id))
         userProfile.mp_access_token = encrypted_access
         userProfile.mp_refresh_token = encrypted_refresh
         userProfile.mp_user_id = response['user_id']
@@ -1924,53 +1883,72 @@ def createSplitPayment(request):
         return Response('User not authenticated', status=401)
 
     try:
-        userProfile = UserProfile.objects.get(user = user)
+        userProfile = UserProfile.objects.get(user=user)
     except UserProfile.DoesNotExist:
-        return Response('UserProfile no encontrado', status = 400)
+        return Response('UserProfile no encontrado', status=400)
 
+    # Descifrar access token del vendedor
     SECRET_KEY = os.environ.get("FERNET_KEY")
     if not SECRET_KEY:
         raise Exception("FERNET_KEY no definida en variables de entorno")
     fernet = Fernet(SECRET_KEY)
-    encrypted_access_token = userProfile.mp_access_token  # bytes
-    access_token = fernet.decrypt(encrypted_access_token.encode()).decode()
+    access_token = fernet.decrypt(userProfile.mp_access_token.encode()).decode()
+    collector_id = userProfile.mp_user_id  # user_id del vendedor sandbox
+    print("Collector ID:", collector_id)
+    print("Access Token:", access_token)
+
     url = "https://api.mercadopago.com/checkout/preferences"
-    
+
+    # Items de prueba
+    items = [
+        {
+            "title": "Producto de prueba",
+            "quantity": 1,
+            "unit_price": 100.0,
+            "currency_id": "ARS"
+        }
+    ]
+
     payload = {
-        "items": [
-            {
-                "title": "Producto de prueba",
-                "quantity": 1,
-                "unit_price": 100.0,
-                "currency_id": "ARS"
-            }
-        ],
+        "items": items,
         "payer": {
-            "email": "test_user_1061633649@testuser.com"  # comprador de prueba
-        },
-        "payment_methods": {
-            "excluded_payment_types": [{"id": "ticket"}],  # opcional
+            "email": "test_user_1428612319@testuser.com"  # comprador de prueba
         },
         "back_urls": {
-            "success": "https://borradoresdeviaje.com/series/series-australia.html",
-            "failure": "https://borradoresdeviaje.com/series/series-tailandia.html",
-            "pending": "https://borradoresdeviaje.com/series/series-cambodia.html"
+            "success": "https://golocalbackend.onrender.com/api/success/",
+            "failure": "https://golocalbackend.onrender.com/api/failure/",
+            "pending": "https://golocalbackend.onrender.com/api/pending/"
         },
-        "notification_url": "https://borradoresdeviaje.com/series/series-vietnam.html",
-        "auto_return": "all",
-        "external_reference": "TEST_PAGO_001",
-        "marketplace": "goLocalmp",
-        "marketplace_fee": 10.0  # comisión de la app en ARS
+        "notification_url": "https://golocalbackend.onrender.com/api/pending/",
+       # "external_reference": "TEST_PAGO_001",
+        "auto_return": "approved",
+        "marketplace_fee":10.0,
+        "payment_methods": {
+            "installments": 1
+        },
+
     }
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
-    }
 
-    resp = requests.post(url, json=payload, headers=headers)
-    return Response(resp.json(), status = 200)
+    print('payload: ', payload)
 
+    sdk = mercadopago.SDK(access_token)
+    resp = sdk.preference().create(payload)
+    
+    #resp = requests.post(url, json=payload, headers=headers)
 
+    print("Status code:", resp)
+    print('type response:   ', type(resp))
+    #print("Body:", resp.json())
+
+    #if resp.status_code != 201:
+    #    return Response({'error': resp.json()}, status=400)
+
+    # Abrimos el sandbox init_point
+    init_point = resp['response']['init_point']
+    sandbox_init_point = resp["response"]["sandbox_init_point"]
+    print(init_point)
+    print(sandbox_init_point)
+    return Response({"sandbox_init_point": sandbox_init_point}, status=200)
 
 @api_view(['GET'])
 def eventosActivos(request):
@@ -2006,3 +1984,167 @@ def failureMP(request):
 def pendingMP(request):
     print('request body:', request.body)
     return Response({"message": "Pending"}, status=200)
+
+import warnings
+import mercadopago
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+@api_view(['POST'])
+def createCompraSimple(request):
+    print('createcompra simple')
+    user = request.user
+    if not user.is_authenticated:
+        return Response('User not authenticated', status=401)   
+
+    try:
+        userProfile = UserProfile.objects.get(user=user, creador = True)
+    except UserProfile.DoesNotExist:
+        return Response('UserProfile no encontrado o el usuario no es creador', status = 400)
+
+    data = request.data
+    print(data['type'])
+    if data['type'] == 'compra_bono':
+        print('type es compra bono')
+        try:
+            bono = Bono.objects.get(uuid = data['uuid'])
+            order = Order.objects.create(
+                userProfile = userProfile,
+                desc = bono.name,
+                total_amount = bono.price,
+                status = 'pending'
+            )
+        except Bono.DoesNotExist:
+            return Response('Bono no encontrado', status=404)
+        print('order creada: ', order.id)
+        metadata = {"type": "compra-bono", "id": bono.id}
+
+    elif data['type'] == 'extend_rango':
+        print('type es extend rango')
+        try:
+            rango = PaymentEventsRanges.objects.get(uuid = data['uuid'])  
+            print('el precio que va a pagar es: ', rango.price-userProfile.payment_events_range.price)
+            order = Order.objects.create(
+                userProfile = userProfile,
+                desc = rango.name,
+                total_amount = rango.price-userProfile.payment_events_range.price,
+                status = 'pending'
+            )
+        except PaymentEventsRanges.DoesNotExist:
+            return Response('Rango no encontrado', status=404)
+        print('order creada: ', order.id)
+        metadata = {"type": "extend-rango", "id": rango.id}
+    
+    print(os.environ.get("MP_ACCESS_TOKEN"))
+    sdk = mercadopago.SDK(os.environ.get("MP_ACCESS_TOKEN"))
+
+    preference_data = {
+    "items": [
+        {
+            "title": order.desc,
+            "quantity": 1,
+            "unit_price": order.total_amount,
+        }
+    ],
+    "payer": {
+        "email": userProfile.user.email
+    },
+     "back_urls": {
+        "success": "https://golocalbackend.onrender.com/api/success/",
+        "failure": "https://golocalbackend.onrender.com/api/failure/",
+        "pending": "https://golocalbackend.onrender.com/api/pending/"
+    },
+    "notification_url": "https://golocalbackend.onrender.com/api/pending/",
+
+    "external_reference": "order_"+str(order.id),
+
+    # 👇 datos adicionales (opcionales)
+    "metadata": metadata,
+    }
+    preference_response = sdk.preference().create(preference_data)
+    warnings.filterwarnings("ignore", category=UserWarning)
+
+
+    preference_response = sdk.preference().create(preference_data)
+    preference = preference_response.get("response")
+
+    if preference and "init_point" in preference:
+        return Response({"init_point": preference["sandbox_init_point"]}, status=200)
+    else:
+        return Response({"error": "Failed to create preference"}, status=400)
+
+
+
+@csrf_exempt
+@api_view(['POST'])
+def webhook_mp(request):
+
+    body = json.loads(request.body.decode("utf-8"))
+     # Caso 1: webhook tipo payment (más confiable)
+    payment_id = None
+    if "data" in body and "id" in body["data"]:
+        payment_id = body["data"]["id"]
+    elif "resource" in body and body.get("topic") == "payment":
+        payment_id = body["resource"]
+
+    sdk = mercadopago.SDK(os.environ.get("MP_ACCESS_TOKEN"))
+
+    if payment_id:
+        payment_response = sdk.payment().get(payment_id)
+        payment = payment_response["response"]
+        external_reference = payment.get("external_reference")
+        metadata = payment.get("metadata", {})
+        status = payment.get("status")
+        amount = payment.get("transaction_amount")
+
+        # Buscar la orden original
+        try:
+            order = Order.objects.get(pk=external_reference.split('_')[1])
+           #order = Order.objects.get(pk='2') # solo para pruebas 
+        except Order.DoesNotExist:
+            return Response({"error": "Order not found"}, status=404)
+        # Evitar duplicados
+        obj, created = Payment.objects.update_or_create(
+            payment_id=payment_id,
+            defaults={
+                "order": order,
+                "status": status,
+                "amount": amount,
+                "external_reference": external_reference,
+                "metadata": metadata,
+            },
+        )
+
+        # Actualizar estado de la orden
+        if status == "approved":
+            order.status = "paid"
+        elif status == "rejected":
+            order.status = "rejected"
+        elif status == "pending":
+            order.status = "pending"
+        order.save()
+
+        if metadata['type'] == 'compra-bono' and status == 'approved' and created:
+            try:
+                bono = Bono.objects.get(id = metadata['id'])
+                userProfile = order.userProfile
+                userProfile.available_planes_gratis += bono.amount
+                userProfile.save()
+            except Bono.DoesNotExist:
+                pass
+        elif metadata['type'] == 'extend-rango' and status == 'approved' and created:
+            try:
+                rango = PaymentEventsRanges.objects.get(id = metadata['id'])
+                userProfile = order.userProfile
+                userProfile.payment_events_range = rango
+                userProfile.save()
+            except PaymentEventsRanges.DoesNotExist:
+                pass
+
+        return Response({"status": "processed"})
+
+    # Caso 2: webhook tipo merchant_order → podés ignorar o usar si querés
+    if body.get("topic") == "merchant_order":
+        return Response({"status": "merchant_order_ignored"})
+
+    return Response({"status": "ok"})

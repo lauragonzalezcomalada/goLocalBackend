@@ -1,8 +1,8 @@
 from django.urls import path
 
 from api.serializers import CampoReservaSerializer
-from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_payment, create_ticket, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, extendPlanWebHook, failureMP, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, pendingMP, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, successMP, tags, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketsLink, user_profile,sign_in,
-                    google_sign_in,updateActivityAssistance,update_user,promos,create_event,user_prorfile_from_uuid,search_users,update_item_details, userCreatedEventsForTheWeek, validate_ticket,soldTicketsForEvent, templates)
+from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_ticket, createCompraSimple, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, failureMP, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, pendingMP, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, successMP, tags, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketsLink, user_profile,sign_in,
+                    google_sign_in,updateActivityAssistance,update_user,promos,create_event,user_prorfile_from_uuid,search_users,update_item_details, userCreatedEventsForTheWeek, validate_ticket,soldTicketsForEvent, templates, webhook_mp)
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import (TokenObtainPairView,TokenRefreshView,)
@@ -55,14 +55,14 @@ urlpatterns = [
     path('register_share/', registerShare, name="registerShare"),
 
     #mercadopago
-    path('create_test_payment/', create_payment, name="export_to_excel"),
-    path('webhook/extend_plan/', extendPlanWebHook, name="extendPlanWebHook"),
     path('generate_oauth_mp_link/', generateOauthMpLink, name="generate_oauth_mp_link"),
     path('success_oauth_registration/', obtainAccessTokenVendedor, name="getAccessTokenVendedor"),
     path('create_split_payment/', createSplitPayment, name="createSplitPayment"),
     path('success/', successMP, name="success_mp"),
     path('failure/', failureMP, name="failure_mp"),
     path('pending/', pendingMP, name="pending_mp"),
+    path('crear_compra_simple/', createCompraSimple, name="createCompraSimple"),
+    path('webhook_mp/', webhook_mp, name="webhook_mp"),
 
     #goLocalQR
     path('eventos_activos/', eventosActivos, name="eventos_activos"),

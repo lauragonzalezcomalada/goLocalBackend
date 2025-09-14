@@ -183,7 +183,7 @@ class UserProfile(models.Model):
     promos = models.ManyToManyField(Promo,blank = True, related_name='promos')
     siguiendo = models.ManyToManyField('self', symmetrical=False, related_name='seguidores', blank=True)
     telefono = models.IntegerField(null = True, blank = True)
-    available_planes_gratis = models.IntegerField(default=8, null=True, blank = True)
+    available_planes_gratis = models.IntegerField(default=4, null=True, blank = True)
     payment_events_range = models.OneToOneField(
         PaymentEventsRanges,
         on_delete=models.SET_NULL,
@@ -319,12 +319,26 @@ class Bono(models.Model):
     amount = models.PositiveIntegerField()
     price =  models.FloatField(default = 0.0,validators=[MinValueValidator(0.0)])
 
+class Order(models.Model):
+    userProfile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="orders")
+    desc = models.CharField(max_length=200)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, default="pending")  
+    created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"Order {self.id} - {self.desc} ({self.status})"
 
-class PaymentForUse(models.Model):
+class Payment(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=True, unique=True)
-    userProfile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='payments_for_use',null=True,blank=True)
-    amount = models.PositiveIntegerField() # ve de mercadopago aquesta quantitat
-    payment_date = models.DateTimeField(auto_now_add=True) # quan es fa el pagament
-    payment_month =  models.DateTimeField(auto_now_add=True) # de quin més es correspon
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payments")
+    payment_id = models.CharField(max_length=50, unique=True)
+    status = models.CharField(max_length=20)  # approved, pending, rejected, refunded...
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    external_reference = models.CharField(max_length=100, null=True, blank=True)
+    metadata = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"Payment {self.payment_id} ({self.status})"

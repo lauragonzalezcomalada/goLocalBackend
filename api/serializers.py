@@ -171,7 +171,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)  # Nombre de usuario
     email = serializers.CharField(source='user.email', read_only=True) #email
     payment_events_range = PaymentEventsRangesSerializer(read_only=True)   # activity_detail = ActivitySerializer(required=False, many=True,read_only=True, source='activities')
-
+        
     class Meta:
         model = UserProfile
         fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'available_planes_gratis', 'payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual']
@@ -186,6 +186,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
         privateplans = instance.planes_invitados.all()
 
         eventos = []
+        eventos_creados = []
 
 
         for activity in activities:
@@ -204,6 +205,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
                 'created_by_user': activity.creador == request.user if request else False
 
             })
+            
         for promo in promos:
             
             eventos.append({
@@ -230,6 +232,42 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
 
             })
 
+        activities_creadas = Activity.objects.filter(creador=instance.user)
+        promos_creadas = Promo.objects.filter(creador=instance.user)
+        planes_creados = PrivatePlan.objects.filter(creador=instance.user)
+
+        for activity in activities_creadas:
+            eventos_creados.append({
+                'type': 'activity',
+                'uuid': activity.uuid,
+                'name': activity.name,
+                'image': activity.image.url if activity.image else None,
+                'startDateandtime': activity.startDateandtime,
+                'created_by_user': True
+            })
+
+        for promo in promos_creadas:
+            eventos_creados.append({
+                'type': 'promo',
+                'uuid': promo.uuid,
+                'name': promo.name,
+                'image': promo.image.url if promo.image else None,
+                'startDateandtime': promo.startDateandtime,
+                'created_by_user': True
+            })
+
+        for plan in planes_creados:
+            eventos_creados.append({
+                'type': 'privateplan',
+                'uuid': plan.uuid,
+                'name': plan.name,
+                'image': plan.image.url if plan.image else None,
+                'startDateandtime': plan.startDateandtime,
+                'asistentes': [inv.invited_user.uuid for inv in plan.privateplaninvitation_set.filter(status=1)],
+                'created_by_user': True
+            })
+
+
         now = timezone.now()
         
         # Asegurate que todos los date_time de eventos son aware:
@@ -242,7 +280,14 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
         #    evento['date_time'] = dt
 
         eventos.sort(key=lambda e: (e['startDateandtime'] < now, e['startDateandtime']))
+        eventos_creados.sort(key=lambda e: (e['startDateandtime'] < now, e['startDateandtime']))
+        
+        
         rep['eventos'] = eventos
+        rep['eventos_creados'] = eventos_creados
+
+        print('eventos creados: ', eventos_creados)
+
         return rep    
 
 class ItemSerializer(serializers.ModelSerializer):
