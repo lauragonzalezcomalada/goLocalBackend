@@ -244,7 +244,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
                 'image': activity.image.url if activity.image else None,
                 'startDateandtime': activity.startDateandtime,
                 'created_by_user': True,
-                'visible': activity.active
+                'active': activity.active
             })
 
         for promo in promos_creadas:
@@ -255,7 +255,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
                 'image': promo.image.url if promo.image else None,
                 'startDateandtime': promo.startDateandtime,
                 'created_by_user': True,
-                'visible':promo.active
+                'active':promo.active
             })
 
         for plan in planes_creados:
@@ -267,7 +267,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
                 'startDateandtime': plan.startDateandtime,
                 'asistentes': [inv.invited_user.uuid for inv in plan.privateplaninvitation_set.filter(status=1)],
                 'created_by_user': True,
-                'visible':plan.active
+                'active':plan.active
             })
 
 
