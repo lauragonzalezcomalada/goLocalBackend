@@ -18,6 +18,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.exceptions import PermissionDenied
 
+from django.core.mail import EmailMessage
 
 
 @api_view(['GET'])
@@ -113,44 +114,42 @@ def activities(request): #hacer doble view
     
         
     
-@api_view(['GET','POST'])
+@api_view(['GET'])
 def promos(request):
-
-    if request.method == 'GET': 
+    print('get de promos')
         
-        #promos = Promo.objects.all()
+    #promos = Promo.objects.all()
+    #promoser = PromoSerializer(promos, many=True)
 
-        #promoser = PromoSerializer(promos, many=True)
+    #return Response(promoser.data)
 
-        #return Response(promoser.data)
+    place_uuid = request.query_params.get('place_uuid',None)
+    promo_uuid = request.query_params.get('promo_uuid',None)
 
-        place_uuid = request.query_params.get('place_uuid',None)
-        promo_uuid = request.query_params.get('promo_uuid',None)
+    if place_uuid:
+        try:
+            place = Place.objects.get(uuid=place_uuid)
+        except Place.DoesNotExist:
+            return Response({'error': 'No place found according to your uuid'}, status=404)
+                
+        promos = Promo.objects.filter(place__uuid=place_uuid).order_by('startDateandtime')
+        
+        if not promos.exists:
+            return Response({'error': 'No promos found according to the submitted place'}, status=404)
 
-        if place_uuid:
-            try:
-                place = Place.objects.get(uuid=place_uuid)
-            except Place.DoesNotExist:
-                return Response({'error': 'No place found according to your uuid'}, status=404)
-                    
-            promos = Promo.objects.filter(place__uuid=place_uuid).order_by('startDateandtime')
-            
-            if not promos.exists:
-                return Response({'error': 'No promos found according to the submitted place'}, status=404)
-
-            serializer = PromoSerializer(promos, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','endDateandtime','tag_detail','creador_image','asistentes'])
-            print(serializer)
-            return Response(serializer.data)
-        elif promo_uuid:
-                try: 
-                    promo =  Promo.objects.get(uuid=promo_uuid)
-                except Promo.DoesNotExist:
-                    return Response({'error': 'No promo found according to your uuid'}, status=404)
-
-                serializer = PromoSerializer(promo)
-                return Response(serializer.data)
-        else:
-            return Response({'error':'Neither place or activity submitted'},status=404)
+        serializer = PromoSerializer(promos, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','endDateandtime','tag_detail','creador_image','asistentes'])
+        print(serializer)
+        return Response(serializer.data)
+    elif promo_uuid:
+        try: 
+            promo =  Promo.objects.get(uuid=promo_uuid)
+        except Promo.DoesNotExist:
+            return Response({'error': 'No promo found according to your uuid'}, status=404)
+        
+        serializer = PromoSerializer(promo)
+        return Response(serializer.data)
+    else:
+        return Response({'error':'Neither place or activity submitted'},status=404)
 
 @api_view(['GET'])
 def registerView(request): 
@@ -261,17 +260,27 @@ from PIL import Image as PILImage
 
 
 
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.pagesizes import A6
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
+from django.utils import timezone
+from io import BytesIO
+from PIL import Image as PILImage
 
-def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code):
+def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code, background_path=None):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A6,
-                            rightMargin=10*mm, leftMargin=10*mm,
-                            topMargin=10*mm, bottomMargin=10*mm)
-    
-
-    qr_size = 60*mm
     width, height = A6
-    # --- Texto ---
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A6,
+        rightMargin=10*mm, leftMargin=10*mm,
+        topMargin=10*mm, bottomMargin=10*mm
+    )
+
+    # --- estilos ---
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         'title',
@@ -288,43 +297,37 @@ def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code):
         textColor="#D34343"
     )
 
-    #pil_img = Image.open(qr_code)
-
+    # --- QR ---
     pil_img = PILImage.open(qr_code)
     qr_io = BytesIO()
     pil_img.save(qr_io, format='PNG')
     qr_io.seek(0)
-    
     qr_img = Image(qr_io, width=60*mm, height=60*mm)
     qr_img.hAlign = 'CENTER'
 
     story = [
         Paragraph(event_name.upper(), title_style),
-        Spacer(1, 5*mm), 
-        #pil_img,
+        Spacer(1, 5*mm),
         qr_img,
-        Spacer(1, 5*mm), 
+        Spacer(1, 5*mm),
         Paragraph(f"Comprador: {buyer_name}", normal_style),
-        Spacer(1, 5*mm), 
+        Spacer(1, 5*mm),
         Paragraph(f"Fecha: {timezone.localtime(event_time).strftime('%d/%m/%Y')}", normal_style),
-        Spacer(1, 3*mm), 
+        Spacer(1, 3*mm),
         Paragraph(f"Hora: {timezone.localtime(event_time).strftime('%H:%M')}", normal_style),
-
     ]
 
+    # --- función para dibujar fondo ---
+    def fondo(canvas, doc):
+        if background_path:
+            bg = ImageReader(background_path)
+            canvas.drawImage(bg, 0, 0, width=width, height=height)
 
-    #qr_io = BytesIO()
-   # pil_img.save(qr_io, format="PNG")
-   # qr_io.seek(0)
-    #c.drawInlineImage(pil_img,(width - qr_size) / 2 , (height - qr_size) / 2, qr_size, qr_size)
+    # Construir PDF con fondo en todas las páginas
+    doc.build(story, onFirstPage=fondo, onLaterPages=fondo)
 
-
-    # Frame centrado en el PDF
-    doc.build(story)
     buffer.seek(0)
     return buffer
-
-
 
 
 
@@ -353,10 +356,8 @@ def create_ticket(request):
         return Response({'error': 'Entrada not found'}, status=404)
 
     cantidad = data.get('cantidad')
-    print('antes de crear tickets')
-    print(entrada.disponibles)
     tickets = []
-    print(data)
+
     for i in range(cantidad):  #map de ['tipus_entrada_1__uuid":{"amount..."}, 'tipus_entrada_2__uuid':{xxx}]
         if(entrada.disponibles > 0):
             ticket = Ticket.objects.create(
@@ -369,12 +370,12 @@ def create_ticket(request):
             )
             print(ticket)
             entrada.disponibles = entrada.disponibles -1
-            tickets.append(generar_ticket_pdf(data['name'],entrada.activity.name, entrada.activity.startDateandtime,ticket.qr_code))
+            tickets.append(generar_ticket_pdf(data['name'],entrada.activity.name, entrada.activity.startDateandtime,ticket.qr_code,os.path.join(settings.BASE_DIR, 'api', 'assets', 'backgroundticketsimage.png')))
         else:
             print('no quedan más entradas')
+
+
     entrada.save()
-    print('después de crear ticket')
-    print(entrada.disponibles)
     userProfile.activities.add(entrada.activity)
     userProfile.save()
 
@@ -385,7 +386,6 @@ def create_ticket(request):
         from_email="no-reply@miapp.com",
         to=[data['email']],
     )
-    print('tickets: ', tickets)
 
 
     # Adjuntar PDF
@@ -912,7 +912,6 @@ def create_event(request):
         return Response({'error': 'User is not authenticated'}, status=401)
 
     data = request.data.copy()   
-    print(data)
     lat = float(data['lat'])
     lng = float(data['lng'])
     nearest_place = find_nearest_place(lat, lng)
@@ -1894,9 +1893,6 @@ def createSplitPayment(request):
     fernet = Fernet(SECRET_KEY)
     access_token = fernet.decrypt(userProfile.mp_access_token.encode()).decode()
     collector_id = userProfile.mp_user_id  # user_id del vendedor sandbox
-    print("Collector ID:", collector_id)
-    print("Access Token:", access_token)
-
     url = "https://api.mercadopago.com/checkout/preferences"
 
     # Items de prueba
@@ -1911,9 +1907,6 @@ def createSplitPayment(request):
 
     payload = {
         "items": items,
-        "payer": {
-            "email": "test_user_1428612319@testuser.com"  # comprador de prueba
-        },
         "back_urls": {
             "success": "https://golocalbackend.onrender.com/api/success/",
             "failure": "https://golocalbackend.onrender.com/api/failure/",
@@ -1923,9 +1916,6 @@ def createSplitPayment(request):
        # "external_reference": "TEST_PAGO_001",
         "auto_return": "approved",
         "marketplace_fee":10.0,
-        "payment_methods": {
-            "installments": 1
-        },
 
     }
 
@@ -1933,21 +1923,9 @@ def createSplitPayment(request):
 
     sdk = mercadopago.SDK(access_token)
     resp = sdk.preference().create(payload)
-    
-    #resp = requests.post(url, json=payload, headers=headers)
 
-    print("Status code:", resp)
-    print('type response:   ', type(resp))
-    #print("Body:", resp.json())
-
-    #if resp.status_code != 201:
-    #    return Response({'error': resp.json()}, status=400)
-
-    # Abrimos el sandbox init_point
     init_point = resp['response']['init_point']
     sandbox_init_point = resp["response"]["sandbox_init_point"]
-    print(init_point)
-    print(sandbox_init_point)
     return Response({"sandbox_init_point": sandbox_init_point}, status=200)
 
 @api_view(['GET'])
@@ -1969,6 +1947,63 @@ def eventosActivos(request):
     print(serializer)
     return Response(serializer.data,status = 200)
 
+@api_view(['POST'])
+def createReserva(request):
+    print('create Reserva')
+
+    user = request.user
+    if not user.is_authenticated:
+            return Response('User not authenticated', status=401)
+    
+    try:
+        userProfile = UserProfile.objects.get(user = user)
+    except UserProfile.DoesNotExist:
+        return Response('Error in retrieving UP', status = 400)
+    
+    try:
+        reserva_form = ReservaForm.objects.get(uuid = request.data['uuid'])
+    except ReservaForm.DoesNotExist:
+        return Response('No se encontro el formulario de reserva', status = 400)
+
+    print('reserva form encontrado!')
+    reserva = Reserva.objects.create(
+        reserva_form=reserva_form,
+        values=request.data['values'],
+    )
+    print('reserva creada: ', reserva)
+
+    pax = 1 #por defecto reservas para 1
+    if 'personas' in request.data['values']:
+        print('hay personas')
+        pax = request.data['values']['personas']
+
+    reserva_form.confirmados += int(pax)
+    reserva_form.save()
+    
+    if reserva_form.activity != None:
+        userProfile.activities.add(reserva_form.activity)
+    else:
+        userProfile.promos.add(reserva_form.promo)
+
+    userProfile.save()
+    email = EmailMessage(
+        subject="Tu reserva para el evento 🎟️",
+        body=f"Hola {userProfile.user.username}, aquí esta tu confirmación de reserva para {reserva_form.activity.name}.\n¡Nos vemos el {reserva_form.activity.startDateandtime}!\n\n\n\n :) ",
+        from_email="no-reply@miapp.com",
+        to=[user.email],
+    )
+    email.send()
+
+    serializer = None
+    if reserva_form.activity != None:
+        asistentes = UserProfile.objects.filter(activities=reserva_form.activity)
+        serializer = UserProfileBasicSerializer(asistentes, many=True, context={"request": request})
+
+    elif reserva_form.promo != None:
+        asistentes = UserProfile.objects.filter(promos=reserva_form.promo)
+        serializer = UserProfileBasicSerializer(asistentes, many=True, context={"request": request})
+
+    return Response(serializer.data, status=200)
 
 @api_view(['POST', 'GET'])
 def successMP(request):
