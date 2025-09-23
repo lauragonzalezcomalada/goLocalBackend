@@ -342,3 +342,15 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment {self.payment_id} ({self.status})"
+    
+
+
+class MessageToUser(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, editable=True, unique=True)
+    dateTime = models.DateTimeField(auto_now_add=True)
+    message = models.TextField(blank = False, null = False)
+    userProfile = models.ManyToManyField(
+            'UserProfile',
+            related_name='messages'
+        )
+    read =  models.BooleanField(default=False)

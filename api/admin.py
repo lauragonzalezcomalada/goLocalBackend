@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib import admin
 # Register your models here.
-from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, Order, Payment, PaymentEventsRanges, Place,Activity, PrivatePlan, PrivatePlanInvitation, Reserva, ReservaForm,Tag, Ticket,UserProfile,Promo,ItemPlan
+from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, MessageToUser, Order, Payment, PaymentEventsRanges, Place,Activity, PrivatePlan, PrivatePlanInvitation, Reserva, ReservaForm,Tag, Ticket,UserProfile,Promo,ItemPlan
 
 
 class UserProfileAdmin(admin.ModelAdmin):
@@ -75,6 +75,8 @@ admin.site.register(EventTemplate)
 admin.site.register(Bono)
 admin.site.register(Payment)
 admin.site.register(Order)
+admin.site.register(MessageToUser)
+
 
 
 

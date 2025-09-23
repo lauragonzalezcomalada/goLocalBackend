@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, PaymentEventsRanges, Place, Activity, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm,Tag, Ticket,UserProfile, ItemPlan
+from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, MessageToUser, PaymentEventsRanges, Place, Activity, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm,Tag, Ticket,UserProfile, ItemPlan
 from django.utils.dateparse import parse_datetime
 
 
@@ -165,16 +165,25 @@ class PaymentEventsRangesSerializer(serializers.ModelSerializer):
         model = PaymentEventsRanges
         fields = ['uuid', 'name', 'start_range', 'end_range', 'price']
 
-        
+class MessageToUserSerializer(serializers.ModelSerializer):
+     class Meta:
+        model = MessageToUser
+        fields = ['uuid','dateTime', 'message','read']  
+
 class UserProfileSerializer(DynamicFieldsModelSerializer):
     tags = TagSerializer(many=True)
     username = serializers.CharField(source='user.username', read_only=True)  # Nombre de usuario
     email = serializers.CharField(source='user.email', read_only=True) #email
     payment_events_range = PaymentEventsRangesSerializer(read_only=True)   # activity_detail = ActivitySerializer(required=False, many=True,read_only=True, source='activities')
-        
+    unread_messages = serializers.SerializerMethodField()
     class Meta:
         model = UserProfile
-        fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'available_planes_gratis', 'payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual']
+        fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'available_planes_gratis', 'payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual','unread_messages']
+
+    def get_unread_messages(self, obj):
+        unread_qs = obj.messages.filter(read=False)
+        return MessageToUserSerializer(unread_qs, many=True).data
+    
 
     def to_representation(self, instance):
         # Aseguramos pasar el contexto con request
@@ -431,3 +440,5 @@ class PaymentEventsRangesSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentEventsRanges
         fields = '__all__'
+
+
