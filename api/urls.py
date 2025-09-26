@@ -1,7 +1,7 @@
 from django.urls import path
 
 from api.serializers import CampoReservaSerializer
-from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_ticket, createCompraSimple, createReserva, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, failureMP, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, pendingMP, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, successMP, tags, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketsLink, user_profile,sign_in,
+from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_ticket, createCompraSimple, createReserva, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, failureMP, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, pendingMP, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, remove_profile_image, successMP, tags, update_profile_image, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketStatus, updateTicketsLink, user_profile,sign_in,
                     google_sign_in,updateActivityAssistance,update_user,promos,create_event,user_prorfile_from_uuid,search_users,update_item_details, userCreatedEventsForTheWeek, validate_ticket,soldTicketsForEvent, templates, webhook_mp)
 from django.conf import settings
 from django.conf.urls.static import static
@@ -22,6 +22,8 @@ urlpatterns = [
     path('auth/google/', google_sign_in, name="auth_google"),
     path('actualizar_asistencia/',updateActivityAssistance, name="updateActivityAssistance"),
     path('actualizar_usuario/',update_user, name="update_user"),
+    path('update_profile_image/', update_profile_image, name="update_profile_image"),
+    path('remove_profile_image/', remove_profile_image, name="remove_profile_image"),
     path('promos/',promos, name="promos"),
     path('userProfile/', user_prorfile_from_uuid, name="user_prorfile_from_uuid"),
     path('search_users/', search_users, name="search_users"),
@@ -43,6 +45,7 @@ urlpatterns = [
     path('update_reserva/', updateReserva, name = "updateReserva"),
     path('campos_reserva/', camposReserva, name='camposReserva'),   
     path('templates/', templates, name='templates'),
+    path('update_ticket_status/', updateTicketStatus, name="updateTicketStatus"),
     path('update_reserva_status/', updateReservaStatus, name="updateReservaStatus"),
     path('update_tickets_link/', updateTicketsLink, name="updateTicketsLink"),
     path('handle_visibility_change/', updateActiveStatus, name="updateActiveStatus"),

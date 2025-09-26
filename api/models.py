@@ -295,8 +295,6 @@ class Reserva(models.Model):
     estado = models.IntegerField(choices=STATUS_CHOICES, default=0)
 
 
-
-
 class EventTemplate(models.Model):
 
     TIPO_EVENT_CHOICES = [

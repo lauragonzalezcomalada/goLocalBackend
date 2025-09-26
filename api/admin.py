@@ -32,7 +32,11 @@ admin.site.register(ItemPlan,ItemPlanAdmin)
 
 @admin.register(EntradasForPlan)
 class EntradasForPlanAdmin(admin.ModelAdmin):
-    list_display = ('titulo',)
+    list_display = ('titulo','activity_name')
+    
+    @admin.display(description="Actividad")
+    def activity_name(self, obj):
+        return obj.activity.name if obj.activity else "-"
    
 admin.site.register(Place)
 admin.site.register(Tag)

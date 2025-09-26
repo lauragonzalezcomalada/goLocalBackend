@@ -1,3 +1,5 @@
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 from rest_framework import serializers
 from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, MessageToUser, PaymentEventsRanges, Place, Activity, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm,Tag, Ticket,UserProfile, ItemPlan
 from django.utils.dateparse import parse_datetime
@@ -106,7 +108,7 @@ class ActivitySerializerForGoLocalQR(serializers.ModelSerializer):
 
     class Meta:
         model = Activity
-        fields = ['uuid', 'name', 'startDateandtime', 'disponibles', 'vendidas', 'asistidos']
+        fields = ['uuid', 'name', 'startDateandtime', 'disponibles', 'vendidas', 'asistidos','image']
 
     def get_disponibles(self, obj):
         # Suma de max_disponibilidad de todas las entradas asociadas
@@ -169,6 +171,53 @@ class MessageToUserSerializer(serializers.ModelSerializer):
      class Meta:
         model = MessageToUser
         fields = ['uuid','dateTime', 'message','read']  
+
+
+
+class UserProfileSerializerForQR(DynamicFieldsModelSerializer):
+    today_activities = serializers.SerializerMethodField()
+    username = serializers.CharField(source='user.username', read_only=True)  # Nombre de usuario
+    email = serializers.CharField(source='user.email', read_only=True) #email
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            'uuid',
+            'username',
+            'bio',
+            'location',
+            'email',
+            'image',
+            'today_activities',
+        ]
+
+    def get_today_activities(self, obj):
+
+        argentina_tz = ZoneInfo("America/Argentina/Buenos_Aires")
+        today_ar = timezone.now().astimezone(argentina_tz).date()
+
+        # Inicio y fin del día en horario argentino
+        start_of_day_ar = datetime.combine(today_ar, time.min, tzinfo=argentina_tz)
+        end_of_day_ar = datetime.combine(today_ar, time.max, tzinfo=argentina_tz)
+
+        # Convertir a UTC para filtrar en DB
+        start_of_day_utc = start_of_day_ar.astimezone(ZoneInfo("UTC"))
+        end_of_day_utc = end_of_day_ar.astimezone(ZoneInfo("UTC"))
+
+        print('🕐 start_of_day_utc:', start_of_day_utc)
+        print('🕐 end_of_day_utc:', end_of_day_utc)
+
+        activities = Activity.objects.filter(
+            creador=obj.user,
+            startDateandtime__range=(start_of_day_utc, end_of_day_utc),
+            control_entradas=True,
+            entradas_for_plan__isnull=False
+        ).distinct()
+
+        for a in activities:
+            print('🎉 actividad:', a.name, a.startDateandtime)
+
+        return ActivitySerializer(activities, many=True).data
 
 class UserProfileSerializer(DynamicFieldsModelSerializer):
     tags = TagSerializer(many=True)
@@ -371,7 +420,7 @@ class EntradaBasicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EntradasForPlan
-        fields = ['activity_name', 'activity_start', 'precio','activity_image']
+        fields = ['titulo','activity_name', 'activity_start', 'precio','activity_image']
 
 
 

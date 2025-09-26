@@ -8,7 +8,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Activity, Bono, CampoReserva, EntradasForPlan, EventTemplate, ItemPlan, Order, Payment, PaymentEventsRanges, Place, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm, Tag, Ticket, UserProfile, User
-from .serializers import ActivitySerializer, ActivitySerializerForGoLocalQR, BonoSerializer, CampoReservaSerializer, EventTemplateSerializer, ItemSerializer, PaymentEventsRangesSerializer, PlaceSerializer, PrivatePlanSerializer, PromoSerializer, ReservaFormSerializer, ReservaSerializer, TagSerializer, TicketSerializer, UserProfileBasicSerializer,UserProfileSerializer
+from .serializers import ActivitySerializer, ActivitySerializerForGoLocalQR, BonoSerializer, CampoReservaSerializer, EventTemplateSerializer, ItemSerializer, PaymentEventsRangesSerializer, PlaceSerializer, PrivatePlanSerializer, PromoSerializer, ReservaFormSerializer, ReservaSerializer, TagSerializer, TicketSerializer, UserProfileBasicSerializer,UserProfileSerializer, UserProfileSerializerForQR
 import ast 
 from datetime import datetime, timedelta, date
 from django.utils import timezone
@@ -404,6 +404,10 @@ def create_ticket(request):
 @api_view(['GET'])
 def user_profile(request):
 
+    from_QR = request.GET.get('fromQR', None)
+
+    print('fromQR ',from_QR)
+
     if not request.user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=404)
     
@@ -413,9 +417,50 @@ def user_profile(request):
         return Response({'error': 'Profile not found'}, status=404)
     
 
-    serializer = UserProfileSerializer(user_profile, context={'request': request})
+    if not from_QR:
+        serializer = UserProfileSerializer(user_profile, context={'request': request})
+    else:
+        serializer = UserProfileSerializerForQR(user_profile, context={'request': request})
 
     return Response(serializer.data)
+
+@api_view(['POST'])
+def update_profile_image (request):
+
+    if not request.user.is_authenticated:
+        return Response({'error': 'User is not authenticated'}, status=404)
+    
+    try:
+        userProfile = UserProfile.objects.get(user=request.user)
+    except UserProfile.DoesNotExist:
+        return Response({'error': 'Profile not found'}, status=404)
+    
+    serializer = UserProfileSerializer(userProfile, data=request.data, partial=True)
+
+    if serializer.is_valid():
+
+        serializer.save()
+        return Response(serializer.data, status=200)
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['POST'])
+def remove_profile_image (request):
+
+    if not request.user.is_authenticated:
+        return Response({'error': 'User is not authenticated'}, status=404)
+    
+    try:
+        userProfile = UserProfile.objects.get(user=request.user)
+        if userProfile.image:
+            userProfile.image.delete(save = True)
+            userProfile.save()
+    except UserProfile.DoesNotExist:
+        return Response({'error': 'Profile not found'}, status=404)
+
+    return Response(status=200)
+   
+
 
 @api_view(['POST'])
 def updatePassword(request):
@@ -694,7 +739,6 @@ def paymentEventsRanges(request):
 @api_view(['POST'])
 def user_prorfile_from_uuid(request):
     user_uuid = request.data['user_uuid']
-    print(user_uuid)
     try:
         user = UserProfile.objects.get(uuid=user_uuid)
     except UserProfile.DoesNotExist:
@@ -1418,6 +1462,9 @@ from collections import defaultdict
 @api_view(['POST'])
 def soldTicketsForEvent(request):
     user = request.user
+    if not user.is_authenticated:
+        return Response('User not authenticated', status=401)
+
     data = request.data.copy()
     event_uuid = data['event_uuid']
     tipo = data['event_type']
@@ -1644,6 +1691,26 @@ def templates(request):
         return Response(status = 200)
 
 @api_view(['POST'])
+def updateTicketStatus(request):
+    user = request.user
+
+    if not user.is_authenticated:
+                return Response('User not authenticated', status=401)
+    
+    try: 
+        ticket = Ticket.objects.get(uuid = request.data['ticket_uuid'])
+    except Ticket.DoesNotExist:
+        return Response('Hubo un error localizando tu ticket', status = 400)
+
+    ticket.status = 1 if ticket.status == 0 else 0
+    ticket.save()
+
+    return Response(ticket.status, status=200)
+
+    
+
+
+@api_view(['POST'])
 def updateReservaStatus(request):
     user = request.user
 
@@ -1703,33 +1770,48 @@ from django.http import HttpResponse
 
 @api_view(['GET'])
 def export_to_excel(request):
+
+    print('user')
+    print(request.user)
+    
+    if not request.user.is_authenticated:
+        return Response('User not authenticated', status=401)
+
+    try: 
+        userProfile = UserProfile.objects.get(user=request.user)
+    except UserProfile.DoesNotExist:
+        return Response('Error obteniendo data del userprofile', status = 404)
+    
+
     # Crear workbook
     wb = openpyxl.Workbook()
     ws = wb.active
 
     mes_resumen =  request.GET.get('current_month', '')
-    print('mes_resumen')
-    print(mes_resumen)
-    print(type(mes_resumen))
     ws.title = "Resumen del mes " + mes_resumen
 
     ws.merge_cells("A1:G1")
     ws["A1"] = "Detalles de los movimientos de "+mes_resumen
     ws.merge_cells("A2:G2")
-    ws['A2'] = 'm'
+    ws["A2"] = ""
     # Escribir encabezados
-    ws.append(["ID", "Usuario", "Monto", "Fecha"])
+    ws.append(["Motivo", "Cantidad", "Fecha", "Estado"])
 
     # Escribir filas (ejemplo con PaymentForUse)
-    #pagos = PaymentForUse.objects.all()
-    #for pago in pagos:
-    #    ws.append([pago.userProfile.user.username, pago.amount, pago.payment_date.strftime("%Y-%m-%d")])
+    try:
 
+        pagos = Payment.objects.filter(order__userProfile=userProfile)
+
+        for pago in pagos:
+            ws.append([pago.order.desc, pago.amount, pago.created_at.strftime("%Y-%m-%d"), pago.status])
+
+    except Payment.DoesNotExist:
+        return Response('error', status =  400)
     # Respuesta HTTP con el archivo
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = 'attachment; filename="pagos.xlsx"'
+    response["Content-Disposition"] = f'attachment; filename="golocal_detalles{mes_resumen}.xlsx"'
     wb.save(response)
     return response
 
@@ -1936,16 +2018,25 @@ def eventosActivos(request):
         return Response('User not authenticated', status=401)
 
     if not user.profile.creador:
-        return Response('No eres creador, no tienes acceso', status = 403)
+        return Response('No eres creador, no tienes acceso', status=403)
     
     today = timezone.localtime(timezone.now()).replace(hour=0, minute=0, second=0, microsecond=0)
-    print('today')
-    print(today)
-    eventos = Activity.objects.filter(creador=user, startDateandtime__gte = today, gratis = False, control_entradas=True,entradas_for_plan__isnull = False)
-    print('eventos')
+    
+    eventos = (
+        Activity.objects
+        .filter(
+            creador=user,
+            startDateandtime__gte=today,
+            gratis=False,
+            control_entradas=True,
+            entradas_for_plan__isnull=False
+        )
+        .order_by('startDateandtime').distinct()
+    )
+    print('eventos', eventos)
     serializer = ActivitySerializerForGoLocalQR(eventos, many=True)
-    print(serializer)
-    return Response(serializer.data,status = 200)
+    return Response(serializer.data, status=200)
+
 
 @api_view(['POST'])
 def createReserva(request):
