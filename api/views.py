@@ -2211,22 +2211,35 @@ def createCompraSimple(request):
         print('final platform fee: ', platform_fee)
         print('final seller_amount: ', seller_amount)
         print('total fee: ', platform_fee+seller_amount)
-        try: 
-            payment = Payment.objects.create(
-                userProfile = userProfile,
-                status = 'pending',
-                descripcion = 'Compra de tickets',
-                event_type = 'externo',
-                total_amount = platform_fee+seller_amount,
-                platform_fee = platform_fee,
-                seller_amount = seller_amount,
-                seller = seller,
-                activity = activity,
-            )
-        except Payment.DoesNotExist:
-            return Response('error creando el payment object', status = 404)
+
+        existing_payment = Payment.objects.filter(
+            userProfile=userProfile,
+            status='pending',
+            activity=activity
+        ).first()
+
+        if existing_payment:
+            payment = existing_payment
+        else: 
+            try: 
+                payment = Payment.objects.create(
+                    userProfile = userProfile,
+                    status = 'pending',
+                    descripcion = 'Compra de tickets',
+                    event_type = 'externo',
+                    total_amount = platform_fee+seller_amount,
+                    platform_fee = platform_fee,
+                    seller_amount = seller_amount,
+                    seller = seller,
+                    activity = activity,
+                )
+            except IntegrityError as e:
+                return Response(f'Error creando el payment object: {str(e)}', status=400)
+            except Exception as e:
+                return Response(f'Error inesperado al crear payment: {str(e)}', status=500)
+            
         print('payment creada: ', payment.id)
-        metadata = {"type": "compra-tickets", "entradas": [{"uuid": e["uuid"], "amount": e["amount"]}for e in data["entradas"]],"name":data['name'], "email":data['email']}
+        metadata = {"type": "compra-tickets", "entradas": [{"uuid": e["uuid"], "amount": e["amount"]}for e in data["entradas"] if e["amount"] > 0],"name":data['name'], "email":data['email']}
         successUrl = "golocal://activity/"+str(activity.uuid)
 
     print(os.environ.get("MP_ACCESS_TOKEN"))
@@ -2329,8 +2342,7 @@ def webhook_mp(request):
             except PaymentEventsRanges.DoesNotExist:
                 pass
         elif metadata['type'] == 'compra-tickets' and status == 'approved' and not payment.applied:
-            print('metadata')
-            print(metadata)
+            print('entradads de metadata: ', metadata['entradas'])
             tickets = []
             oneTime = True
             for e in metadata['entradas']:
