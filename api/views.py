@@ -2227,7 +2227,7 @@ def createCompraSimple(request):
             return Response('error creando el payment object', status = 404)
         print('payment creada: ', payment.id)
         metadata = {"type": "compra-tickets", "entradas": [{"uuid": e["uuid"], "amount": e["amount"]}for e in data["entradas"]],"name":data['name'], "email":data['email']}
-        successUrl = "golocal://activity/"+activity.uuid
+        successUrl = "golocal://activity/"+str(activity.uuid)
 
     print(os.environ.get("MP_ACCESS_TOKEN"))
     sdk = mercadopago.SDK(os.environ.get("MP_ACCESS_TOKEN"))
