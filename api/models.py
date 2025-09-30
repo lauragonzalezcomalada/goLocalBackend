@@ -1,4 +1,5 @@
 from datetime import timezone
+from decimal import Decimal
 import random
 import string
 import uuid
@@ -198,6 +199,12 @@ class UserProfile(models.Model):
     mp_refresh_token = models.TextField(null=True, blank=True)
     mp_user_id = models.BigIntegerField(null=True, blank=True)
     token_expiration = models.DateTimeField(null=True, blank=True)
+    platform_fee = models.DecimalField(
+    max_digits=3,       #i.e. 12.5% no 12.45%
+    decimal_places=1,  
+    default=Decimal("12.5")
+)
+
 
 class EntradasForPlan(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True)
@@ -317,30 +324,33 @@ class Bono(models.Model):
     amount = models.PositiveIntegerField()
     price =  models.FloatField(default = 0.0,validators=[MinValueValidator(0.0)])
 
-class Order(models.Model):
-    userProfile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="orders")
-    desc = models.CharField(max_length=200)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, default="pending")  
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Order {self.id} - {self.desc} ({self.status})"
-
 class Payment(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, editable=True, unique=True)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="payments")
-    payment_id = models.CharField(max_length=50, unique=True)
-    status = models.CharField(max_length=20)  # approved, pending, rejected, refunded...
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    external_reference = models.CharField(max_length=100, null=True, blank=True)
-    metadata = models.JSONField(default=dict)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, null=True, blank = True)
+    userProfile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="payments") # el qui paga
+    
+    # Datos del pago
+    payment_id = models.CharField(max_length=50, unique=True, null=True, blank=True)  # ID de MP
+    status = models.CharField(max_length=20)  # status del client a MP: approved, pending, rejected, refunded
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2) # quantitat total
+    platform_fee = models.DecimalField(max_digits=10, decimal_places=2) # quantitat per mi
+    seller_amount = models.DecimalField(max_digits=10, decimal_places=2) # quantitat pel seller
+    
+    # Info de negocio
+    descripcion = models.CharField(max_length=200, null=True, blank = True) # descripció de xq es el payment
+    seller = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="incoming_payments") #pk
+    activity = models.ForeignKey(Activity,on_delete=models.CASCADE, related_name="payments", null=True, blank=True ) #pk o null si es transacció interna
+    event_type = models.CharField(max_length=20)  # activity, promo, plan, etc.
+    
+    # Metadata adicional y tracking
+    metadata = models.JSONField(default=dict, null=True, blank = True) # per store el que em torna MP, per si hi han errors
+    payout_status = models.CharField(max_length=20, default='pending')  # status de jo pagat al seller
+    created_at = models.DateTimeField(auto_now_add=True) # quan es crea payment
+    updated_at = models.DateTimeField(auto_now=True) # quan s'actualitza, de status...
+
+    applied = models.BooleanField(null=False, blank = False, default = False) # bool de si s'executa el que es necessiti, crear tickets, extendre els bonos, range...
 
     def __str__(self):
-        return f"Payment {self.payment_id} ({self.status})"
-    
+        return f"Payment {self.payment_id} - {self.status}" 
 
 
 class MessageToUser(models.Model):

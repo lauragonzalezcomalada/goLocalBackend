@@ -204,9 +204,7 @@ class UserProfileSerializerForQR(DynamicFieldsModelSerializer):
         start_of_day_utc = start_of_day_ar.astimezone(ZoneInfo("UTC"))
         end_of_day_utc = end_of_day_ar.astimezone(ZoneInfo("UTC"))
 
-        print('🕐 start_of_day_utc:', start_of_day_utc)
-        print('🕐 end_of_day_utc:', end_of_day_utc)
-
+     
         activities = Activity.objects.filter(
             creador=obj.user,
             startDateandtime__range=(start_of_day_utc, end_of_day_utc),

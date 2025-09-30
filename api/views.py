@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.shortcuts import render
 from geopy.distance import geodesic
 from collections import defaultdict,OrderedDict
@@ -7,7 +8,7 @@ import mercadopago
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Activity, Bono, CampoReserva, EntradasForPlan, EventTemplate, ItemPlan, Order, Payment, PaymentEventsRanges, Place, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm, Tag, Ticket, UserProfile, User
+from .models import Activity, Bono, CampoReserva, EntradasForPlan, EventTemplate, ItemPlan, Payment, PaymentEventsRanges, Place, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm, Tag, Ticket, UserProfile, User
 from .serializers import ActivitySerializer, ActivitySerializerForGoLocalQR, BonoSerializer, CampoReservaSerializer, EventTemplateSerializer, ItemSerializer, PaymentEventsRangesSerializer, PlaceSerializer, PrivatePlanSerializer, PromoSerializer, ReservaFormSerializer, ReservaSerializer, TagSerializer, TicketSerializer, UserProfileBasicSerializer,UserProfileSerializer, UserProfileSerializerForQR
 import ast 
 from datetime import datetime, timedelta, date
@@ -270,7 +271,9 @@ from django.utils import timezone
 from io import BytesIO
 from PIL import Image as PILImage
 
-def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code, background_path=None):
+def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code): #, background_path=None):
+
+   # print('background path: ', background_path)
     buffer = BytesIO()
     width, height = A6
     doc = SimpleDocTemplate(
@@ -318,13 +321,13 @@ def generar_ticket_pdf(buyer_name, event_name, event_time, qr_code, background_p
     ]
 
     # --- función para dibujar fondo ---
-    def fondo(canvas, doc):
-        if background_path:
-            bg = ImageReader(background_path)
-            canvas.drawImage(bg, 0, 0, width=width, height=height)
+   # def fondo(canvas, doc):
+      #  if background_path:
+       #     bg = ImageReader(background_path)
+       #     canvas.drawImage(bg, 0, 0, width=width, height=height)
 
     # Construir PDF con fondo en todas las páginas
-    doc.build(story, onFirstPage=fondo, onLaterPages=fondo)
+    doc.build(story)#, onFirstPage=fondo, onLaterPages=fondo)
 
     buffer.seek(0)
     return buffer
@@ -370,7 +373,7 @@ def create_ticket(request):
             )
             print(ticket)
             entrada.disponibles = entrada.disponibles -1
-            tickets.append(generar_ticket_pdf(data['name'],entrada.activity.name, entrada.activity.startDateandtime,ticket.qr_code,os.path.join(settings.BASE_DIR, 'api', 'assets', 'backgroundticketsimage.png')))
+            tickets.append(generar_ticket_pdf(data['name'],entrada.activity.name, entrada.activity.startDateandtime,ticket.qr_code)) #,os.path.join(settings.BASE_DIR, 'api', 'assets', 'backgroundticketsimage.png')))
         else:
             print('no quedan más entradas')
 
@@ -2129,20 +2132,33 @@ def createCompraSimple(request):
         return Response('UserProfile no encontrado o el usuario no es creador', status = 400)
 
     data = request.data
-    print(data['type'])
+    print(data) 
+    #data['type'] pot ser: 
+    ##### --> 'compra_bono'
+    ##### --> 'extend_rango'
+    ##### --> 'compra_tickets'
+
     if data['type'] == 'compra_bono':
+       
         print('type es compra bono')
         try:
             bono = Bono.objects.get(uuid = data['uuid'])
-            order = Order.objects.create(
+            seller = UserProfile.objects.get(id=1)
+            payment = Payment.objects.create(
                 userProfile = userProfile,
-                desc = bono.name,
+                status = 'pending',
+                descripcion = bono.name,
+                event_type = 'interno',
                 total_amount = bono.price,
-                status = 'pending'
+                platform_fee = 0.0,
+                seller_amount = bono.price,
+                seller = seller, #jo
+                activity = None,
             )
+           
         except Bono.DoesNotExist:
             return Response('Bono no encontrado', status=404)
-        print('order creada: ', order.id)
+        print('payment creado: ', payment.id)
         metadata = {"type": "compra-bono", "id": bono.id}
 
     elif data['type'] == 'extend_rango':
@@ -2150,26 +2166,71 @@ def createCompraSimple(request):
         try:
             rango = PaymentEventsRanges.objects.get(uuid = data['uuid'])  
             print('el precio que va a pagar es: ', rango.price-userProfile.payment_events_range.price)
-            order = Order.objects.create(
+
+            seller = UserProfile.objects.get(id=1)
+            payment = Payment.objects.create(
                 userProfile = userProfile,
-                desc = rango.name,
+                status = 'pending',
+                descripcion = rango.name,
+                event_type = 'interno',
                 total_amount = rango.price-userProfile.payment_events_range.price,
-                status = 'pending'
+                platform_fee = 0.0,
+                seller_amount = rango.price-userProfile.payment_events_range.price,
+                seller = seller, #jo
+                activity = None,
             )
         except PaymentEventsRanges.DoesNotExist:
             return Response('Rango no encontrado', status=404)
-        print('order creada: ', order.id)
+        print('order creada: ', payment.id)
         metadata = {"type": "extend-rango", "id": rango.id}
-    
+    elif data['type'] == 'compra-tickets':
+        print('type es compra tickets')
+        print(data)
+        #request['entradas'] = [{'uuid':'xxx', 'amount':2},{'uuid':'yyy','amount':1}] --> 2 normales y 1 VIP i.e.
+       
+        platform_fee = 0
+        seller_amount = 0
+        seller = None
+        activity = None
+        for entrada in data['entradas']:
+            try:
+                entrada_comprar = EntradasForPlan.objects.get(uuid=entrada['uuid'])
+                seller = UserProfile.objects.get(user = entrada_comprar.activity.creador)
+                activity = entrada_comprar.activity
+                seller_amount += Decimal(entrada_comprar.precio) * Decimal(entrada['amount'])
+                platform_fee += Decimal(seller.platform_fee)*Decimal(entrada_comprar.precio)*Decimal(entrada['amount'])
+            except EntradasForPlan.DoesNotExist:
+                return Response('No encontramos las entradas', status =400)
+            
+        print('final platform fee: ', platform_fee)
+        print('final seller_amount: ', seller_amount)
+        try: 
+            payment = Payment.objects.create(
+                userProfile = userProfile,
+                status = 'pending',
+                descripcion = 'Compra de tickets',
+                event_type = 'externo',
+                total_amount = platform_fee+seller_amount,
+                platform_fee = platform_fee,
+                seller_amount = seller_amount,
+                seller = seller,
+                activity = activity,
+            )
+        except Payment.DoesNotExist:
+            return Response('error creando el payment object', status = 404)
+        print('payment creada: ', payment.id)
+        metadata = {"type": "compra-tickets", "entradas": [{"uuid": e["uuid"], "amount": e["amount"]}for e in data["entradas"]],"name":data['name'], "email":data['email']}
+        
+
     print(os.environ.get("MP_ACCESS_TOKEN"))
     sdk = mercadopago.SDK(os.environ.get("MP_ACCESS_TOKEN"))
 
     preference_data = {
     "items": [
         {
-            "title": order.desc,
+            "title": payment.descripcion,
             "quantity": 1,
-            "unit_price": order.total_amount,
+            "unit_price": float(payment.total_amount),
         }
     ],
     "payer": {
@@ -2182,7 +2243,7 @@ def createCompraSimple(request):
     },
     "notification_url": "https://golocalbackend.onrender.com/api/pending/",
 
-    "external_reference": "order_"+str(order.id),
+    "external_reference": "order_"+str(payment.uuid),
 
     # 👇 datos adicionales (opcionales)
     "metadata": metadata,
@@ -2195,7 +2256,7 @@ def createCompraSimple(request):
     preference = preference_response.get("response")
 
     if preference and "init_point" in preference:
-        return Response({"init_point": preference["sandbox_init_point"]}, status=200)
+        return Response({"init_point": preference["init_point"]}, status=200)
     else:
         return Response({"error": "Failed to create preference"}, status=400)
 
@@ -2206,7 +2267,8 @@ def createCompraSimple(request):
 def webhook_mp(request):
 
     body = json.loads(request.body.decode("utf-8"))
-     # Caso 1: webhook tipo payment (más confiable)
+    
+    # Caso 1: webhook tipo payment (más confiable)
     payment_id = None
     if "data" in body and "id" in body["data"]:
         payment_id = body["data"]["id"]
@@ -2217,55 +2279,91 @@ def webhook_mp(request):
 
     if payment_id:
         payment_response = sdk.payment().get(payment_id)
+        print('payment_ response: ', payment_response)
         payment = payment_response["response"]
         external_reference = payment.get("external_reference")
         metadata = payment.get("metadata", {})
         status = payment.get("status")
         amount = payment.get("transaction_amount")
 
-        # Buscar la orden original
         try:
-            order = Order.objects.get(pk=external_reference.split('_')[1])
-           #order = Order.objects.get(pk='2') # solo para pruebas 
-        except Order.DoesNotExist:
-            return Response({"error": "Order not found"}, status=404)
-        # Evitar duplicados
-        obj, created = Payment.objects.update_or_create(
-            payment_id=payment_id,
-            defaults={
-                "order": order,
-                "status": status,
-                "amount": amount,
-                "external_reference": external_reference,
-                "metadata": metadata,
-            },
-        )
+            payment = Payment.objects.get(pk=external_reference.split('_')[1])
+        except Payment.DoesNotExist:
+            return Response('Error, payment not found', status= 400)
+        
+        payment.metadata = metadata
+        payment.payout_status = 'pending'
+        payment.status = status
+        payment.save()
 
-        # Actualizar estado de la orden
-        if status == "approved":
-            order.status = "paid"
-        elif status == "rejected":
-            order.status = "rejected"
-        elif status == "pending":
-            order.status = "pending"
-        order.save()
-
-        if metadata['type'] == 'compra-bono' and status == 'approved' and created:
+        ####SE COMPRO UN BONO DE PLANES GRATIS
+        if metadata['type'] == 'compra-bono' and status == 'approved' and not payment.applied:
             try:
                 bono = Bono.objects.get(id = metadata['id'])
-                userProfile = order.userProfile
+                userProfile = payment.userProfile
                 userProfile.available_planes_gratis += bono.amount
                 userProfile.save()
+                payment.applied = True
+                payment.save()
             except Bono.DoesNotExist:
                 pass
-        elif metadata['type'] == 'extend-rango' and status == 'approved' and created:
+        ####SE EXTENDIÓ EL RANGO DE PLANES PAGOS
+        elif metadata['type'] == 'extend-rango' and status == 'approved' and not payment.applied:
             try:
                 rango = PaymentEventsRanges.objects.get(id = metadata['id'])
-                userProfile = order.userProfile
+                userProfile = payment.userProfile
                 userProfile.payment_events_range = rango
                 userProfile.save()
+                payment.applied = True
+                payment.save()
             except PaymentEventsRanges.DoesNotExist:
                 pass
+        elif metadata['type'] == 'compra-tickets' and status == 'approved' and not payment.applied:
+            print('metadata')
+            print(metadata)
+            tickets = []
+            oneTime = True
+            for e in metadata['entradas']:
+                try:
+                    entrada = EntradasForPlan.objects.get(uuid = e['uuid'])
+                    for ticket in e['amount']:
+                        ticket = Ticket.objects.create(
+                            user_profile=payment.userProfile,
+                            entrada=entrada,
+                            nombre= metadata['name'],
+                            email= metadata['email'],
+                            fecha_compra=timezone.now(),
+                            precio = entrada.precio
+                        )
+                        entrada.disponibles = entrada.disponibles -1
+                        tickets.append(generar_ticket_pdf(metadata['name'],entrada.activity.name, entrada.activity.startDateandtime,ticket.qr_code)) #,os.path.join(settings.BASE_DIR, 'api', 'assets', 'backgroundticketsimage.png')))
+                        entrada.save()
+                    if oneTime: 
+                        payment.userProfile.activities.add(entrada.activity)
+                        oneTime = False
+
+
+
+                except EntradasForPlan.DoesNotExist:
+                    return Response('Error no such Entrada encontrada', status = 400)
+            
+            email = EmailMessage(
+                subject="Tu ticket para el evento 🎟️",
+                body=f"Hola {metadata['name']}, adjuntamos tu ticket para {entrada.activity.name}.\n¡Nos vemos el {entrada.activity.startDateandtime}!",
+                from_email="no-reply@miapp.com",
+                to=[metadata['email']],
+            )
+
+
+            # Adjuntar PDF
+            for i, ticket in enumerate(tickets):
+            # ticket es un BytesIO o archivo
+                ticket.seek(0)
+                email.attach(f"ticket_{i+1}.pdf", ticket.read(), "application/pdf")
+        #  email.attach("ticket.pdf", tickets.read(), "application/pdf")
+
+            # Enviar
+            email.send()
 
         return Response({"status": "processed"})
 
@@ -2274,3 +2372,11 @@ def webhook_mp(request):
         return Response({"status": "merchant_order_ignored"})
 
     return Response({"status": "ok"})
+
+
+
+
+
+
+    
+
