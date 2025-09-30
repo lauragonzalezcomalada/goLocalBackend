@@ -2254,7 +2254,7 @@ def createCompraSimple(request):
 
     preference_response = sdk.preference().create(preference_data)
     preference = preference_response.get("response")
-
+    print('preference mp: ', preference)
     if preference and "init_point" in preference:
         return Response({"init_point": preference["init_point"]}, status=200)
     else:
