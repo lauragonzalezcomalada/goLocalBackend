@@ -2203,7 +2203,7 @@ def createCompraSimple(request):
                     print('precio etnrada: ', entrada_comprar.precio)
                     seller_amount += Decimal(entrada_comprar.precio) * Decimal(entrada['amount'])
                     print('seller_amount: ', seller_amount)
-                    platform_fee += Decimal(seller.platform_fee)*Decimal(entrada_comprar.precio)*Decimal(entrada['amount'])
+                    platform_fee +=  (Decimal(seller.platform_fee) / Decimal(100))*Decimal(entrada_comprar.precio)*Decimal(entrada['amount'])
                     print('platform_fee: ', platform_fee)
                 except EntradasForPlan.DoesNotExist:
                     return Response('No encontramos las entradas', status =400)
@@ -2336,7 +2336,7 @@ def webhook_mp(request):
             for e in metadata['entradas']:
                 try:
                     entrada = EntradasForPlan.objects.get(uuid = e['uuid'])
-                    for ticket in e['amount']:
+                    for _ in range(e['amount']):
                         ticket = Ticket.objects.create(
                             user_profile=payment.userProfile,
                             entrada=entrada,
@@ -2347,11 +2347,11 @@ def webhook_mp(request):
                         )
                         entrada.disponibles = entrada.disponibles -1
                         tickets.append(generar_ticket_pdf(metadata['name'],entrada.activity.name, entrada.activity.startDateandtime,ticket.qr_code)) #,os.path.join(settings.BASE_DIR, 'api', 'assets', 'backgroundticketsimage.png')))
-                        entrada.save()
+                        
                     if oneTime: 
                         payment.userProfile.activities.add(entrada.activity)
                         oneTime = False
-
+                    entrada.save()
 
 
                 except EntradasForPlan.DoesNotExist:
@@ -2360,7 +2360,7 @@ def webhook_mp(request):
             email = EmailMessage(
                 subject="Tu ticket para el evento 🎟️",
                 body=f"Hola {metadata['name']}, adjuntamos tu ticket para {entrada.activity.name}.\n¡Nos vemos el {entrada.activity.startDateandtime}!",
-                from_email="no-reply@miapp.com",
+                from_email="golocalgolocal@gmail.com",
                 to=[metadata['email']],
             )
 
