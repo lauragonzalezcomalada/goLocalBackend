@@ -2289,12 +2289,13 @@ def webhook_mp(request):
         print('payment_ response: ', payment_response)
         payment = payment_response["response"]
         external_reference = payment.get("external_reference")
+        payment_uuid = external_reference.split("_")[1]
         metadata = payment.get("metadata", {})
         status = payment.get("status")
         amount = payment.get("transaction_amount")
 
         try:
-            payment = Payment.objects.get(pk=external_reference.split('_')[1])
+            payment = Payment.objects.get(uuid = payment_uuid)
         except Payment.DoesNotExist:
             return Response('Error, payment not found', status= 400)
         
@@ -2302,6 +2303,8 @@ def webhook_mp(request):
         payment.payout_status = 'pending'
         payment.status = status
         payment.save()
+
+        print('metadata: ', metadata)
 
         ####SE COMPRO UN BONO DE PLANES GRATIS
         if metadata['type'] == 'compra-bono' and status == 'approved' and not payment.applied:
