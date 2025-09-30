@@ -2160,6 +2160,7 @@ def createCompraSimple(request):
             return Response('Bono no encontrado', status=404)
         print('payment creado: ', payment.id)
         metadata = {"type": "compra-bono", "id": bono.id}
+        successUrl = "https://golocalbackend.onrender.com/api/success/",
 
     elif data['type'] == 'extend_rango':
         print('type es extend rango')
@@ -2179,6 +2180,7 @@ def createCompraSimple(request):
                 seller = seller, #jo
                 activity = None,
             )
+            successUrl = "https://golocalbackend.onrender.com/api/success/"
         except PaymentEventsRanges.DoesNotExist:
             return Response('Rango no encontrado', status=404)
         print('order creada: ', payment.id)
@@ -2187,23 +2189,28 @@ def createCompraSimple(request):
         print('type es compra tickets')
         print(data)
         #request['entradas'] = [{'uuid':'xxx', 'amount':2},{'uuid':'yyy','amount':1}] --> 2 normales y 1 VIP i.e.
-       
+
         platform_fee = 0
         seller_amount = 0
         seller = None
         activity = None
         for entrada in data['entradas']:
-            try:
-                entrada_comprar = EntradasForPlan.objects.get(uuid=entrada['uuid'])
-                seller = UserProfile.objects.get(user = entrada_comprar.activity.creador)
-                activity = entrada_comprar.activity
-                seller_amount += Decimal(entrada_comprar.precio) * Decimal(entrada['amount'])
-                platform_fee += Decimal(seller.platform_fee)*Decimal(entrada_comprar.precio)*Decimal(entrada['amount'])
-            except EntradasForPlan.DoesNotExist:
-                return Response('No encontramos las entradas', status =400)
+            if entrada['amount'] > 0:
+                try:
+                    entrada_comprar = EntradasForPlan.objects.get(uuid=entrada['uuid'])
+                    seller = UserProfile.objects.get(user = entrada_comprar.activity.creador)
+                    activity = entrada_comprar.activity
+                    print('precio etnrada: ', entrada_comprar.precio)
+                    seller_amount += Decimal(entrada_comprar.precio) * Decimal(entrada['amount'])
+                    print('seller_amount: ', seller_amount)
+                    platform_fee += Decimal(seller.platform_fee)*Decimal(entrada_comprar.precio)*Decimal(entrada['amount'])
+                    print('platform_fee: ', platform_fee)
+                except EntradasForPlan.DoesNotExist:
+                    return Response('No encontramos las entradas', status =400)
             
         print('final platform fee: ', platform_fee)
         print('final seller_amount: ', seller_amount)
+        print('total fee: ', platform_fee+seller_amount)
         try: 
             payment = Payment.objects.create(
                 userProfile = userProfile,
@@ -2220,7 +2227,7 @@ def createCompraSimple(request):
             return Response('error creando el payment object', status = 404)
         print('payment creada: ', payment.id)
         metadata = {"type": "compra-tickets", "entradas": [{"uuid": e["uuid"], "amount": e["amount"]}for e in data["entradas"]],"name":data['name'], "email":data['email']}
-        
+        successUrl = "golocal://activity/"+activity.uuid
 
     print(os.environ.get("MP_ACCESS_TOKEN"))
     sdk = mercadopago.SDK(os.environ.get("MP_ACCESS_TOKEN"))
@@ -2237,11 +2244,11 @@ def createCompraSimple(request):
         "email": userProfile.user.email
     },
      "back_urls": {
-        "success": "https://golocalbackend.onrender.com/api/success/",
+        "success": successUrl,
         "failure": "https://golocalbackend.onrender.com/api/failure/",
         "pending": "https://golocalbackend.onrender.com/api/pending/"
     },
-    "notification_url": "https://golocalbackend.onrender.com/api/pending/",
+    "notification_url": "https://golocalbackend.onrender.com/api/webhook_mp/",
 
     "external_reference": "order_"+str(payment.uuid),
 
@@ -2265,7 +2272,7 @@ def createCompraSimple(request):
 @csrf_exempt
 @api_view(['POST'])
 def webhook_mp(request):
-
+    print('webhook_hitt')
     body = json.loads(request.body.decode("utf-8"))
     
     # Caso 1: webhook tipo payment (más confiable)
