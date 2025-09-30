@@ -2356,6 +2356,8 @@ def webhook_mp(request):
 
                 except EntradasForPlan.DoesNotExist:
                     return Response('Error no such Entrada encontrada', status = 400)
+            payment.applied = True
+            payment.save()
             
             email = EmailMessage(
                 subject="Tu ticket para el evento 🎟️",
