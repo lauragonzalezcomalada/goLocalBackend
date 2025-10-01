@@ -127,30 +127,30 @@ def promos(request):
     place_uuid = request.query_params.get('place_uuid',None)
     promo_uuid = request.query_params.get('promo_uuid',None)
 
-    if place_uuid:
-        try:
-            place = Place.objects.get(uuid=place_uuid)
-        except Place.DoesNotExist:
-            return Response({'error': 'No place found according to your uuid'}, status=404)
+    #if place_uuid:
+    #    try:
+    #        place = Place.objects.get(uuid=place_uuid)
+    #    except Place.DoesNotExist:
+    #        return Response({'error': 'No place found according to your uuid'}, status=404)
                 
-        promos = Promo.objects.filter(place__uuid=place_uuid).order_by('startDateandtime')
-        
-        if not promos.exists:
-            return Response({'error': 'No promos found according to the submitted place'}, status=404)
-
-        serializer = PromoSerializer(promos, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','endDateandtime','tag_detail','creador_image','asistentes'])
-        print(serializer)
-        return Response(serializer.data)
-    elif promo_uuid:
+       
+    if promo_uuid:
         try: 
             promo =  Promo.objects.get(uuid=promo_uuid)
         except Promo.DoesNotExist:
             return Response({'error': 'No promo found according to your uuid'}, status=404)
         
-        serializer = PromoSerializer(promo)
+        serializer = PromoSerializer(promo, context={'request': request})
         return Response(serializer.data)
     else:
-        return Response({'error':'Neither place or activity submitted'},status=404)
+        promos = Promo.objects.filter(startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
+        
+        if not promos.exists:
+            return Response({'error': 'No promos found according to the submitted place'}, status=404)
+
+        serializer = PromoSerializer(promos, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','endDateandtime','tag_detail','creador_image','asistentes'], context={'request': request})
+        return Response(serializer.data)
+      #  return Response({'error':'Neither place or activity submitted'},status=404)
 
 @api_view(['GET'])
 def registerView(request): 

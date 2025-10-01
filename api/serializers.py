@@ -64,6 +64,7 @@ class ActivitySerializer(DynamicFieldsModelSerializer):
     tag_detail = TagSerializer(required=False, many=True,read_only=True, source='tags') #para el GET, que se muestra todo el Tag
     creador_image = serializers.SerializerMethodField()
     created_by_user = serializers.SerializerMethodField()
+    creador = UserProfileBasicSerializer(many=False, read_only=True, source='creador') 
 
     entradas_for_plan = EntradasForPlanSerializer(many=True, read_only=True)
     reservas_forms = ReservasFormsSerializer(many=True, read_only = True)
@@ -129,6 +130,7 @@ class PromoSerializer(DynamicFieldsModelSerializer):
     image = serializers.ImageField(required=False, allow_null=True)
     tag_detail = TagSerializer(required=False, many=True,read_only=True, source='tags') #para el GET, que se muestra todo el Tag
     reservas_forms = ReservasFormsSerializer(many=True, read_only = True)
+    asistentes = UserProfileBasicSerializer(many=True, read_only=True, source='promos')  
     user_isgoing = serializers.SerializerMethodField()
     creador_image = serializers.SerializerMethodField()
     created_by_user = serializers.SerializerMethodField()
@@ -147,7 +149,10 @@ class PromoSerializer(DynamicFieldsModelSerializer):
         # Necesita acceso al usuario del contexto
         request = self.context.get('request', None)
         if request and hasattr(request, 'user'):
-            return obj.creador == request.user
+            print("creador:", obj.creador, obj.creador.id)
+            print("request.user:", request.user, request.user.id)
+            print("comparación:", obj.creador == request.user)
+            return obj.creador.id == request.user.id
         return False
     
     def get_user_isgoing(self, obj):

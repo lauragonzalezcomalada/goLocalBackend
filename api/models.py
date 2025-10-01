@@ -60,6 +60,7 @@ class Activity(models.Model):
     shares = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
     clicks_on_tickets_link = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
     active = models.BooleanField(default=False)
+    colaboradores = models.ManyToManyField('UserProfile', related_name='activities_collaborated', blank=True)
 
 
     def __str__(self):
@@ -80,11 +81,12 @@ class Promo(models.Model):
     repeat = models.BooleanField(default=False)
     tags = models.ManyToManyField(Tag, blank=True, related_name='promos')
     creador = models.ForeignKey(User, on_delete=models.CASCADE, default = 1)
-    asistentes = models.IntegerField(default = 0)
     reserva_necesaria =  models.BooleanField(default=False, blank = True, null = True)
     views = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
     shares = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
     active = models.BooleanField(default=False)
+    colaboradores = models.ManyToManyField('UserProfile', related_name='promos_collaborated', blank=True)
+
 
 
 
