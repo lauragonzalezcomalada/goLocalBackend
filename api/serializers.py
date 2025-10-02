@@ -64,7 +64,7 @@ class ActivitySerializer(DynamicFieldsModelSerializer):
     tag_detail = TagSerializer(required=False, many=True,read_only=True, source='tags') #para el GET, que se muestra todo el Tag
     creador_image = serializers.SerializerMethodField()
     created_by_user = serializers.SerializerMethodField()
-    creador = UserProfileBasicSerializer(many=False, read_only=True, source='creador') 
+    creador = UserProfileBasicSerializer(many=False, read_only=True) 
 
     entradas_for_plan = EntradasForPlanSerializer(many=True, read_only=True)
     reservas_forms = ReservasFormsSerializer(many=True, read_only = True)
