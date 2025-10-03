@@ -1738,6 +1738,12 @@ def updateActiveStatus(request):
 
     if not user.is_authenticated:
         return Response('User not authenticated', status=401)
+    
+    try:
+        userProfile = UserProfile.objects.get(user = user)
+    except UserProfile.DoesNotExist:
+        return Response('User profile not found', status = 404)
+    
 
     data = request.data.copy()
     if data['tipo'] == 0: #activity
@@ -1763,6 +1769,11 @@ def updateActiveStatus(request):
     evento.active = not active_status_previo
     evento.save()
 
+    if evento.gratis == True:
+        if userProfile.available_planes_gratis <= 0:
+            return Response('No tienes más planes gratis disponibles para activar este evento', status = 400)
+        userProfile.available_planes_gratis -= 1
+        userProfile.save()
     return Response(evento.active, status = 200)
         
     

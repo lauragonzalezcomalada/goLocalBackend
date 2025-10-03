@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 from rest_framework import serializers
 from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, MessageToUser, PaymentEventsRanges, Place, Activity, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm,Tag, Ticket,UserProfile, ItemPlan
@@ -228,6 +228,8 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
     email = serializers.CharField(source='user.email', read_only=True) #email
     payment_events_range = PaymentEventsRangesSerializer(read_only=True)   # activity_detail = ActivitySerializer(required=False, many=True,read_only=True, source='activities')
     unread_messages = serializers.SerializerMethodField()
+    can_create_free_plan = serializers.SerializerMethodField()
+    can_create_payment_plan = serializers.SerializerMethodField()
     class Meta:
         model = UserProfile
         fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'available_planes_gratis', 'payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual','unread_messages']
@@ -236,6 +238,24 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
         unread_qs = obj.messages.filter(read=False)
         return MessageToUserSerializer(unread_qs, many=True).data
     
+    def get_can_create_free_plan(self,obj):
+        return obj.available_planes_gratis > 0
+    
+    def get_can_create_payment_plan(self,obj):
+        
+        start_month = date.today().replace(day=1)
+        end_month = date.today().replace(day=28)
+        active_activities_this_month =  Activity.objects.filter(
+            created_by=self.user,
+            is_free=False,
+            active=True,
+            start_datetime__range=(start_month, end_month)
+        ).count()
+
+        if not self.payment_events_range:
+            return False
+        return active_activities_this_month < self.payment_events_range.max_events_per_month
+        
 
     def to_representation(self, instance):
         # Aseguramos pasar el contexto con request
