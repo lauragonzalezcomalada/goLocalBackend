@@ -437,7 +437,7 @@ def update_profile_image (request):
         userProfile = UserProfile.objects.get(user=request.user)
     except UserProfile.DoesNotExist:
         return Response({'error': 'Profile not found'}, status=404)
-    
+    print('data del request: ', request.data)
     serializer = UserProfileSerializer(userProfile, data=request.data, partial=True)
 
     if serializer.is_valid():
