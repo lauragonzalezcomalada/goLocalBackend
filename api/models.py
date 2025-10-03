@@ -47,7 +47,7 @@ class Activity(models.Model):
     lat = models.FloatField(null=True)
     long = models.FloatField(null=True)
     direccion = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to='activities_images/', null=True, blank=True)
+    image = models.ImageField(upload_to='activities_images/', null=True, blank=True,max_length=1000)
     startDateandtime = models.DateTimeField(null=True, blank=True)
     tickets_link = models.CharField(max_length=100, null=True, blank=True)
     gratis = models.BooleanField(default=True)
@@ -75,7 +75,7 @@ class Promo(models.Model):
     lat = models.FloatField(null=True)
     long = models.FloatField(null=True)
     direccion = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to='promo_images/', null=True, blank=True)
+    image = models.ImageField(upload_to='promo_images/', null=True, blank=True,max_length=1000)
     startDateandtime = models.DateTimeField(null=True, blank=True)
     endDateandtime = models.DateTimeField(null=True, blank=True)
     repeat = models.BooleanField(default=False)
@@ -110,7 +110,7 @@ class PrivatePlan(models.Model):
     lat = models.FloatField(null=True)
     long = models.FloatField(null=True)
     direccion = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to='private_plans_images/', null=True, blank=True)
+    image = models.ImageField(upload_to='private_plans_images/', null=True, blank=True,max_length=1000)
     startDateandtime = models.DateTimeField(null=True, blank=True)
     creador = models.ForeignKey(User, on_delete=models.CASCADE, default = 1)
     gratis = models.BooleanField(default=True)
@@ -243,7 +243,7 @@ class Ticket(models.Model):
         (1, 'Asistido'),
     ]
     status = models.IntegerField(choices=STATUS_CHOICES, default=0)
-    qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
+    qr_code = models.ImageField(upload_to='qr_codes/', blank=True, null=True,max_length=1000)
 
     def __str__(self):
         return f"Entrada de {self.user_profile} tipo {self.entrada.titulo} ({self.uuid})"
