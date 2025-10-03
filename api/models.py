@@ -173,7 +173,7 @@ class UserProfile(models.Model):
     creation_date = models.DateTimeField(auto_now_add=True)
     location = models.CharField(max_length=256, blank=True, null=True)
     locationId = models.CharField(max_length=100, blank=True, null=True)
-    image = models.ImageField(upload_to='profiles_images/', null=True, blank=True,max_length=255)
+    image = models.ImageField(upload_to='profiles_images/', null=True, blank=True,max_length=1000)
     rate = models.IntegerField(
         default=0,
         validators=[
