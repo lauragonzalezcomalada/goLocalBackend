@@ -958,20 +958,20 @@ def create_event(request):
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=401)
 
-    data = request.data.copy()   
-    lat = float(data['lat'])
-    lng = float(data['lng'])
+    data = request.data
+    if isinstance(data, QueryDict):
+        data._mutable = True
+    lat = float(request.data['lat'])
+    lng = float(request.data['lng'])
     nearest_place = find_nearest_place(lat, lng)
-    is_private_plan = data['tipoEvento'] == '2'
-    tipoEvento = int(data['tipoEvento'])
-    print(tipoEvento)
-    tags_list = data['tags']
-    print('isprivateplan', is_private_plan)
+    is_private_plan = request.data['tipoEvento'] == '2'
+    tipoEvento = int(request.data['tipoEvento'])
+    tags_list = request.data['tags']
     if is_private_plan == False:
         print('is not private plan')
         # Parsear la lista de tags correctamente
-        
-        tags_raw = data['tags']
+
+        tags_raw = request.data['tags']
         
         try:
             tags_list = ast.literal_eval(tags_raw)
@@ -1001,21 +1001,18 @@ def create_event(request):
     data['gratis'] = request.data.get('gratis') == 'true' #if request.data.get('gratis') == 'true' == 'True': True; si es 'false' == 'true' --> False
     
     if data['gratis'] == True:
-        print('rserva necearia')
-        print(request.data.get('reserva'))
         data['reserva_necesaria'] = request.data.get('reserva') == 'true'
 
     if (data['gratis'] == False and tipoEvento == 0): #gratis = False i es activity
         data['control_entradas'] = request.data.get('centralizarEntradas') == 'true'
         
         if(data['control_entradas'] == False):
-            data['tickets_link'] = request.data.get('urlCompraEntradas', None)
+            data['tickets_link'] = request.data.get('tickets_link', None)
     
     data.pop('tipoEvento', None)
     if tipoEvento == 0:
         serializer = ActivitySerializer(data=data)
     elif tipoEvento == 1:
-        print('ispromo')
         serializer = PromoSerializer(data=data)
     else: #data['tipoEvento] == '2'
         serializer = PrivatePlanSerializer(data=data)
@@ -1780,7 +1777,7 @@ def updateActiveStatus(request):
 
 
 import openpyxl
-from django.http import HttpResponse
+from django.http import HttpResponse, QueryDict, QueryDict
 
 @api_view(['GET'])
 def export_to_excel(request):

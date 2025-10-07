@@ -232,7 +232,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
     can_create_payment_plan = serializers.SerializerMethodField()
     class Meta:
         model = UserProfile
-        fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'available_planes_gratis', 'payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual','unread_messages']
+        fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'can_create_free_plan', 'can_create_payment_plan','payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual','unread_messages']
 
     def get_unread_messages(self, obj):
         unread_qs = obj.messages.filter(read=False)
@@ -246,15 +246,15 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
         start_month = date.today().replace(day=1)
         end_month = date.today().replace(day=28)
         active_activities_this_month =  Activity.objects.filter(
-            created_by=self.user,
-            is_free=False,
+            creador=obj.user,
+            gratis=False,
             active=True,
-            start_datetime__range=(start_month, end_month)
+            startDateandtime__range=(start_month, end_month)
         ).count()
 
-        if not self.payment_events_range:
+        if not obj.payment_events_range:
             return False
-        return active_activities_this_month < self.payment_events_range.max_events_per_month
+        return active_activities_this_month < obj.payment_events_range.end_range
         
 
     def to_representation(self, instance):
