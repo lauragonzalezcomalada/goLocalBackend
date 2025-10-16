@@ -217,8 +217,7 @@ class UserProfileSerializerForQR(DynamicFieldsModelSerializer):
             entradas_for_plan__isnull=False
         ).distinct()
 
-        for a in activities:
-            print('🎉 actividad:', a.name, a.startDateandtime)
+    
 
         return ActivitySerializer(activities, many=True).data
 

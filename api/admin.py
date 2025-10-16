@@ -11,7 +11,7 @@ class UserProfileAdmin(admin.ModelAdmin):
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
     filter_horizontal = ('tags',)  # Esto permite seleccionar múltiples tags de manera más fácil
-    list_display = ['name','creador','startDateandtime','gratis','active']
+    list_display = ['id','name','creador','startDateandtime','gratis','active']
 
 
 class PromoAdmin(admin.ModelAdmin):
@@ -77,7 +77,14 @@ class ReservaFormAdmin(admin.ModelAdmin):
 
 admin.site.register(EventTemplate)
 admin.site.register(Bono)
-admin.site.register(Payment)
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('descripcion', 'activity_name', 'total_amount','status', 'payout_status')
+    @admin.display(description="Actividad")
+    def activity_name(self, obj):
+        return obj.activity.name if obj.activity else "-"
+  
+
 admin.site.register(MessageToUser)
 
 

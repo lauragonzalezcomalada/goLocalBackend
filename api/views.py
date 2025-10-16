@@ -1,4 +1,5 @@
 from decimal import Decimal
+from sqlite3 import IntegrityError
 from django.shortcuts import render
 from geopy.distance import geodesic
 from collections import defaultdict,OrderedDict
@@ -28,22 +29,16 @@ def hello_world(request):
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
-    print('token/-creador')
 
     def validate(self, attrs):
         data = super().validate(attrs)
         require_creador = self.context['request'].data.get('require_creador', False)
-        print('required_creator')
-        print(require_creador)
+      
         if require_creador:
             user = self.user
-            print('user')
-            print(user)
-            print(user.profile.creador)
+        
             if not hasattr(user, 'profile') or not user.profile.creador:
-                print('no creador')
                 raise PermissionDenied("El usuario no tiene permisos de creador") #codigo 403
-        print(data)
         return data
     
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -117,12 +112,7 @@ def activities(request): #hacer doble view
     
 @api_view(['GET'])
 def promos(request):
-    print('get de promos')
-        
-    #promos = Promo.objects.all()
-    #promoser = PromoSerializer(promos, many=True)
 
-    #return Response(promoser.data)
 
     place_uuid = request.query_params.get('place_uuid',None)
     promo_uuid = request.query_params.get('promo_uuid',None)
@@ -184,10 +174,6 @@ def registerShare(request):
     promo = request.GET.get('promo',None)
     uuid = request.GET.get('uuid')
 
-    print('activity: ', activity)
-    print('promo: ', promo)
-    print('uuid: ', uuid)
-    
     if activity:
         try:
             activity = Activity.objects.get(uuid = uuid)
@@ -221,10 +207,8 @@ def tags(request):
 
 @api_view(['GET'])
 def validate_ticket(request):
-    print('in validate ticket')
     ticket_uuid = request.GET.get('ticket', None)
     event_uuid = request.GET.get('scanning_event', None)
-    print(ticket_uuid)
     if not ticket_uuid:
         return Response({'error': 'Ticket UUID is required'}, status=400)
 
@@ -371,7 +355,6 @@ def create_ticket(request):
             fecha_compra=timezone.now(),
             precio = entrada.precio
             )
-            print(ticket)
             entrada.disponibles = entrada.disponibles -1
             tickets.append(generar_ticket_pdf(data['name'],entrada.activity.name, entrada.activity.startDateandtime,ticket.qr_code)) #,os.path.join(settings.BASE_DIR, 'api', 'assets', 'backgroundticketsimage.png')))
         else:
@@ -408,9 +391,6 @@ def create_ticket(request):
 def user_profile(request):
 
     from_QR = request.GET.get('fromQR', None)
-
-    print('fromQR ',from_QR)
-
     if not request.user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=404)
     
@@ -437,7 +417,6 @@ def update_profile_image (request):
         userProfile = UserProfile.objects.get(user=request.user)
     except UserProfile.DoesNotExist:
         return Response({'error': 'Profile not found'}, status=404)
-    print('data del request: ', request.data)
     serializer = UserProfileSerializer(userProfile, data=request.data, partial=True)
 
     if serializer.is_valid():
@@ -467,7 +446,6 @@ def remove_profile_image (request):
 
 @api_view(['POST'])
 def updatePassword(request):
-    print('updatepasswords')
     
     user = request.user
     if not user.is_authenticated:
@@ -490,7 +468,7 @@ import calendar
 
 
 
-from itertools import chain
+from itertools import chain, groupby
 
 
 @api_view(['GET'])
@@ -505,7 +483,6 @@ def billingStatus(request):
         return Response(400)
     
     first_date, last_date = get_month_bounds()
-    print('month bounds: ', first_date, last_date)
 
     activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date))
     promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date))
@@ -525,11 +502,9 @@ def billingStatus(request):
     #eventos_sin_centralizar = []
     
     eventos_gratuitos = eventos_gratuitos + promos.count() #S'inicialitza amb la quantitat de promos, que sempre són gratis
-    print('eventos_ gratius de promos: ', eventos_gratuitos)
     for evento in activities:
         if evento.gratis == True and evento.active== True: #Eventos gratuitos
-            print('evento gratuito: ', evento.name)
-            print('evento gratuitos: ', evento.startDateandtime)
+          
             eventos_gratuitos += 1
         elif evento.active== True: #Eventos de pago:
             eventos_pagos += 1
@@ -539,7 +514,6 @@ def billingStatus(request):
        #     eventos_sin_centralizar.append(evento)
 
     # Mostrar el tramo de los planes pagos centralizados
-    print('eventos_ gratius: ', eventos_gratuitos)
 
     
         #0 a 12 --> 20.000ARS
@@ -668,8 +642,6 @@ def get_month_bounds():
 @api_view(['POST'])
 def ableToTurnVisible(request):
 
-    print('able to turn visible')
-    print(request.data)
     user = request.user
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=404)
@@ -680,30 +652,17 @@ def ableToTurnVisible(request):
         return Response('Such user does not exist', status = 400)
     
     first_date, last_date = get_month_bounds()
-    print('first_date : ', first_date)
     status = None
     if request.data['free_event'] == True: #Planes gratuitos
-        print('free event')
         available_free_plans_fromUP = userProfile.available_planes_gratis # valor máximo que tiene para el mes
-        print('available free plans stored in UP:', available_free_plans_fromUP)
         activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date), gratis = True, active = True)
         promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date), active = True)
-
         created_free_events = activities.count() + promos.count()
-        print('created_free_events: ', created_free_events)
-
         available_free_plans = available_free_plans_fromUP-created_free_events
-        print('available_free_plans: ', available_free_plans)
-        print('available_free_plans ', available_free_plans)
         status = available_free_plans > 0
-        print('status: ', status)
     else: #Planes pagos
-        print('payment event')
         activities = Activity.objects.filter(creador=user, startDateandtime__date__range=(first_date, last_date), gratis = False, active = True)
-        print('end_range: ',userProfile.payment_events_range.end_range)
-        print('amount of activities: ', activities.count())
         status = activities.count() < userProfile.payment_events_range.end_range
-        print('status: ', status)
 
 
     return Response(status, status = 200)   
@@ -717,10 +676,8 @@ def bonos(request):
     except Bono.DoesNotExist:
         return Response('No available bonos at the moment', status = 400)
 
-    print(bonos)
     serializer = BonoSerializer(bonos, many = True)
 
-    
     return Response(serializer.data, status = 200)
 
     
@@ -771,38 +728,127 @@ def get_tickets(request):
         )
     except:
         return Response('You have no tickets for such activity ${activity_uuid}', status=404)
-
-    print(tickets)
-
     serializer = TicketSerializer(tickets, many= True, context={'request': request}, fields = ['entrada', 'nombre', 'email', 'qr_code'])
     return Response(serializer.data)
 
+@api_view(['GET'])
+def transactions(request):
+
+    user = request.user
+
+    if not user.is_authenticated:
+        return Response({'error': 'User is not authenticated'}, status=404)
+    
+    try:
+        userProfile = UserProfile.objects.get(user=user)
+    except UserProfile.DoesNotExist:
+        return Response({'error':'Error retrieving UserProfile'}, status = 400)
+    
+
+    incoming_payments = userProfile.incoming_payments.all()
+    incoming_payments_list =  list(incoming_payments.values('activity', 'status', 'total_amount','payout_status','descripcion','updated_at','payment_id')) 
+    approved_payments = list(filter(lambda x: x['status'] == 'approved', incoming_payments_list)) #pagos realizados por los usuarios
+    approved_payments = list(filter(lambda x: x['activity']!= None, approved_payments)) #pagos destinados a pagar entradas, no internos
+    app_service_payments = list(filter(lambda x:x['activity'] == None, incoming_payments_list))
+    total_amount_app_service = sum(payment['total_amount'] for payment in app_service_payments)
+
+    approved_payments.sort(key=lambda x: x['activity']) 
+
+    total_amount_pending = 0
+    total_amount_approved = 0
+
+    # Iteramos sobre la lista y sumamos según el status
+    for payment in approved_payments:
+        if payment['payout_status'] == 'pending':
+            total_amount_pending += payment['total_amount']
+        elif payment['payout_status'] == 'approved':
+            total_amount_approved += payment['total_amount']
+    
+    total_amount_global = total_amount_pending + total_amount_approved
+    
+
+
+    grouped_by_activity = groupby(approved_payments, key=lambda x: x['activity']) #agrupar por actividad
+
+    payments_grouped_dict = {}
+
+    for activity, group in grouped_by_activity:
+        payments_grouped_dict[activity] = list(group)
+
+    data_grouped_dict = {}
+    next_due_date = None
+    due_date_amount = 0
+    for activity in payments_grouped_dict: #montar estructura de datos
+        total_amount = 0
+        activity_obj= Activity.objects.get(id=activity)
+        for payment in payments_grouped_dict[activity]:
+            total_amount += payment['total_amount']
+        
+        if  payments_grouped_dict[activity][0]['payout_status'] != 'approved' and next_due_date == None:
+            print('entra')
+            next_due_date = activity_obj.startDateandtime + timedelta(days=1) 
+            due_date_amount = total_amount
+    
+        elif payments_grouped_dict[activity][0]['payout_status'] != 'approved' and (activity_obj.startDateandtime + timedelta(days=1)).date() <= next_due_date.date(): 
+            print('entra a la suma: ', payments_grouped_dict[activity][0])
+            next_due_date = activity_obj.startDateandtime + timedelta(days=1) 
+            due_date_amount += total_amount
+            
+        data_grouped_dict[activity] = {"total_amount": total_amount, "due_date": activity_obj.startDateandtime + timedelta(days=1), "status": payment['payout_status'],"activity": {"uuid": activity_obj.uuid, "image": activity_obj.image.url if activity_obj.image else None, "name":activity_obj.name,"startDateandtime":activity_obj.startDateandtime}}
+     
+    grouped_by_status = defaultdict(list)
+    for activity, data in data_grouped_dict.items():
+        status = data['status']  # Obtén el status
+        grouped_by_status[status].append(data)
+    grouped_by_status = dict(grouped_by_status)
+
+    return Response({'payments':grouped_by_status, 'app_service_payments':app_service_payments,'total_amounts':{'total_amount': total_amount_global, 'payed_amount': total_amount_approved, 'pending_amount': total_amount_pending, 'app_service_payments': total_amount_app_service, 'next_due_date':next_due_date, 'due_date_amount':due_date_amount}},status = 200)
+
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
+
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+token_generator = PasswordResetTokenGenerator()
+
+@api_view(['POST'])
+def sendMailForPwdRecovery(request):
+    
+    email = request.data.get("email", "").strip().lower()
+    if not email:
+        return Response({"detail": "Si el email existe, te enviaremos instrucciones."}, status = 200)
+
+    try:
+        user = User.objects.get(email = email)
+
+    except User.DoesNotExist:
+        #Responta genèrica, sempre la mateixa, per no desvelar si existeix l'usuari o no
+        return Response({"detail": "Si el email existe, te enviaremos instrucciones."}, status = 200)
+           
+    uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+    token = token_generator.make_token(user)
+
+    reset_link = f"https://go-local-web.vercel.app/reset-password?uid={uidb64}&token={token}"
+
+    subject = "Recupera tu contraseña"
+    message = f"Hola,\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n{reset_link}\n\nSi no fuiste tú, ignora este correo."
+    send_mail(subject, message, 'no-reply@miapp.com', [email], fail_silently=False)
+
+    return Response({"detail": "Si el email existe, te enviaremos instrucciones."}, status=200)
+
+    
 @api_view(['POST'])
 def update_user(request):
-
-    print(request.data)
-    
     data = request.data.copy()
     user_uuid = data['user_uuid']
     try:
         user = UserProfile.objects.get(uuid=user_uuid)
-
         if 'description' in data:
             user.bio = data['description']
-
-        if 'birthday_date' in data:
-            birth_date_str = data['birthday_date']
-            try:
-                birth_date = datetime.strptime(birth_date_str, "%Y/%m/%d").date()
-            
-            except ValueError:
-                return Response("Fecha inválida. Usa el formato DD/MM/YYYY.", status=400)
-
-            user.birth_date = birth_date
-
-        if 'place_location' in data:
-            user.location = data['place_location']
-            user.locationId = data['place_location_id']
+        if 'bio' in data:
+            user.bio = data['bio']
+        
+        if 'location' in data:
+            user.location = data['location']
 
         if 'tags' in data:
         # Parsear la lista de tags correctamente
@@ -813,11 +859,17 @@ def update_user(request):
                     tags_list = []
             except (ValueError, SyntaxError):
                 tags_list = []
-            print(tags_list)
             user.tags.set(tags_list)
         
         if 'image' in data:
             user.image = data['image']
+
+        if 'telefono' in data:       
+            user.telefono = int(data['telefono'])
+        
+        if 'email' in data:
+            user.user.email = data['email']
+            user.user.save()
         user.save()
         return Response({'user_uuid': user.uuid}, status=200)
 
@@ -828,7 +880,7 @@ def find_nearest_place(lat, lng):
     all_places = Place.objects.all()
     for place in all_places:
         dist = geodesic((lat, lng), (place.latitude, place.longitude)).km
-        if dist < 50:  #radio de 50km
+        if dist < 50: 
             return place
 
     return None
@@ -839,7 +891,9 @@ def sign_in(request):
     data = request.data
 
     if User.objects.filter(email=data['email']).exists():
-        return Response({"error":"Este mail ya está en uso para un usuario"},status=404)
+        return Response({"email_error":"Este mail ya está en uso para un usuario"},status=404)
+    if User.objects.filter(username=data['name']).exists():
+        return Response({"name_error":"Este nombre ya está en uso para un usuario"},status=404)
     
     user = User.objects.create_user(
             username=data['name'],
@@ -849,7 +903,6 @@ def sign_in(request):
         )
     userProfile = UserProfile.objects.create(user=user)
 
-    print(userProfile.uuid)
     refresh = RefreshToken.for_user(user)
     return Response({
             'refresh': str(refresh),
@@ -936,12 +989,8 @@ def updateActivityAssistance(request):
                     return Response('Error in access token', status = 404)
             except (ValueError, TypeError):
                 return Response({'error': 'update must be an integer'}, status=400)
-            print(promo.asistentes)
 
             promo.asistentes = promo.asistentes + update_value
-            
-            print(promo.asistentes)
-
             promo.save()
 
             return Response({'asistentes': promo.asistentes}, status=200)
@@ -968,9 +1017,6 @@ def create_event(request):
     tipoEvento = int(request.data['tipoEvento'])
     tags_list = request.data['tags']
     if is_private_plan == False:
-        print('is not private plan')
-        # Parsear la lista de tags correctamente
-
         tags_raw = request.data['tags']
         
         try:
@@ -993,7 +1039,6 @@ def create_event(request):
             ##    ['lauragonzalezcomalada@gmail.com'],
             ##    fail_silently=False,
             ##)
-        print('not nearest place')
         data['place'] = None
     else:
         data['place'] = nearest_place.id
@@ -1095,17 +1140,12 @@ def private_plans(request):
     user = request.user
     privatePlanUuid = request.GET.get('privatePlanUuid','')
 
-    print(privatePlanUuid)
-    print(type(user))
-    
     #Generic per tenir els privatePlans d'un user
     if not privatePlanUuid:
         try:
             userProfile = UserProfile.objects.get(user = user)
         except UserProfile.DoesNotExist:
             return Response(status = 404)   
-
-        print(userProfile.planes_invitados.all())
         
         serializer = PrivatePlanSerializer(userProfile.planes_invitados.all(), many=True,context={'request': request})
     # return Response(UserProfileSerializer(userProfile).data, status = 200)
@@ -1370,7 +1410,6 @@ def entradasForUserAdmin(request):
             procesar_evento(activity, tipo=0)
 
         elif ReservaForm.objects.filter(activity=activity).exists():
-            print('activity con reserva')
             procesar_reservas(activity,tipo = 0)
 
         elif activity.gratis == True and activity.reserva_necesaria == False:
@@ -1781,9 +1820,6 @@ from django.http import HttpResponse, QueryDict, QueryDict
 
 @api_view(['GET'])
 def export_to_excel(request):
-
-    print('user')
-    print(request.user)
     
     if not request.user.is_authenticated:
         return Response('User not authenticated', status=401)
@@ -1846,8 +1882,6 @@ import secrets
 
 @api_view(['GET'])
 def generateOauthMpLink(request):
-    print('user: ', request.user.id)
-    # step1_get_code_challenge.py
     # ==== CONFIGURA TUS DATOS ==== 
     # ==== GENERAR PKCE ====
     code_verifier = secrets.token_urlsafe(64)
@@ -1873,8 +1907,7 @@ def generateOauthMpLink(request):
 
    
     auth_url += '&state='+ str(request.user.id)
-    print('auth url que me devuelve')
-    print(auth_url)
+   
     return Response({'link':auth_url}, status = 200)
 
 
@@ -1895,11 +1928,8 @@ import requests
 
 @api_view(['GET'])
 def obtainAccessTokenVendedor(request):
-    print('objtaint...')
     auth_code = request.GET.get('code')
-    print('auth_code: ', auth_code)
     user_id = request.GET.get('state')
-    print('user_id: ', user_id)
 
       # viene de la URL
     with open("pkce_data.txt") as f:
@@ -1918,8 +1948,7 @@ def obtainAccessTokenVendedor(request):
 
     )
 
-    print('status code de la resp: ' ,resp.status_code)
-    print('body de la resp: ', resp.text)
+   
     if resp.status_code != 200:
         print("Error OAuth:", resp.text)
         return Response({"error": "No se pudo obtener access token"}, status=400)
@@ -1935,11 +1964,9 @@ def obtainAccessTokenVendedor(request):
     #                'live_mode': True}
 
     SECRET_KEY = os.environ.get("FERNET_KEY")
-    print('secret key: ', SECRET_KEY)
     if not SECRET_KEY:
         raise Exception("FERNET_KEY no definida en variables de entorno")
     fernet = Fernet(SECRET_KEY)
-    print('fernet: '   , fernet)
     ##{'access_token': 'APP_USR-2369085495887617-081912-ad216cd1cef5503d9bd07a7dff81907a-2633951459', 'token_type': 'Bearer', 'expires_in': 15552000, 'scope': 'offline_access payments read write', 'user_id': 2633951459, 'refresh_token': 'TG-68a4aa9309f7650001b985af-2633951459', 'public_key': 'APP_USR-3917cb81-ca09-4a7b-971f-1d6161e72f56', 'live_mode': True}
     # ===== Cifrar los tokens =====
     encrypted_access = fernet.encrypt(response['access_token'].encode()).decode()
@@ -1952,7 +1979,6 @@ def obtainAccessTokenVendedor(request):
         userProfile.mp_refresh_token = encrypted_refresh
         userProfile.mp_user_id = response['user_id']
         userProfile.save()
-        print("Tokens guardados en UserProfile ✅")
     except UserProfile.DoesNotExist:
         
         with open("mp_tokens_encrypted.txt", "ab") as f:
@@ -1961,7 +1987,6 @@ def obtainAccessTokenVendedor(request):
             f.write(b"access_token: " + encrypted_access + b"\n")
             f.write(b"refresh_token: " + encrypted_refresh + b"\n")
             f.write(b"mp_user_id: " + response['user_id'] + b"\n\n")
-        print("Tokens cifrados guardados en mp_tokens_encrypted.txt ✅")
         return ('Error in storing the access token and refresh token')
 
 
@@ -2012,7 +2037,6 @@ def createSplitPayment(request):
 
     }
 
-    print('payload: ', payload)
 
     sdk = mercadopago.SDK(access_token)
     resp = sdk.preference().create(payload)
@@ -2044,14 +2068,12 @@ def eventosActivos(request):
         )
         .order_by('startDateandtime').distinct()
     )
-    print('eventos', eventos)
     serializer = ActivitySerializerForGoLocalQR(eventos, many=True)
     return Response(serializer.data, status=200)
 
 
 @api_view(['POST'])
 def createReserva(request):
-    print('create Reserva')
 
     user = request.user
     if not user.is_authenticated:
@@ -2067,16 +2089,13 @@ def createReserva(request):
     except ReservaForm.DoesNotExist:
         return Response('No se encontro el formulario de reserva', status = 400)
 
-    print('reserva form encontrado!')
     reserva = Reserva.objects.create(
         reserva_form=reserva_form,
         values=request.data['values'],
     )
-    print('reserva creada: ', reserva)
 
     pax = 1 #por defecto reservas para 1
     if 'personas' in request.data['values']:
-        print('hay personas')
         pax = request.data['values']['personas']
 
     reserva_form.confirmados += int(pax)
@@ -2109,17 +2128,14 @@ def createReserva(request):
 
 @api_view(['POST', 'GET'])
 def successMP(request):
-    print('request body:', request.body)
     return Response({"message": "Success"}, status=200)
 
 @api_view(['POST', 'GET'])
 def failureMP(request):
-    print('request body:', request.body)
     return Response({"message": "Failure"}, status=200)
 
 @api_view(['POST', 'GET'])
 def pendingMP(request):
-    print('request body:', request.body)
     return Response({"message": "Pending"}, status=200)
 
 import warnings
@@ -2129,7 +2145,6 @@ from django.views.decorators.csrf import csrf_exempt
 @csrf_exempt
 @api_view(['POST'])
 def createCompraSimple(request):
-    print('createcompra simple')
     user = request.user
     if not user.is_authenticated:
         return Response('User not authenticated', status=401)   
@@ -2140,7 +2155,6 @@ def createCompraSimple(request):
         return Response('UserProfile no encontrado o el usuario no es creador', status = 400)
 
     data = request.data
-    print(data) 
     #data['type'] pot ser: 
     ##### --> 'compra_bono'
     ##### --> 'extend_rango'
@@ -2148,7 +2162,6 @@ def createCompraSimple(request):
 
     if data['type'] == 'compra_bono':
        
-        print('type es compra bono')
         try:
             bono = Bono.objects.get(uuid = data['uuid'])
             seller = UserProfile.objects.get(id=1)
@@ -2166,15 +2179,12 @@ def createCompraSimple(request):
            
         except Bono.DoesNotExist:
             return Response('Bono no encontrado', status=404)
-        print('payment creado: ', payment.id)
         metadata = {"type": "compra-bono", "id": bono.id}
         successUrl = "https://golocalbackend.onrender.com/api/success/",
 
     elif data['type'] == 'extend_rango':
-        print('type es extend rango')
         try:
             rango = PaymentEventsRanges.objects.get(uuid = data['uuid'])  
-            print('el precio que va a pagar es: ', rango.price-userProfile.payment_events_range.price)
 
             seller = UserProfile.objects.get(id=1)
             payment = Payment.objects.create(
@@ -2191,11 +2201,9 @@ def createCompraSimple(request):
             successUrl = "https://golocalbackend.onrender.com/api/success/"
         except PaymentEventsRanges.DoesNotExist:
             return Response('Rango no encontrado', status=404)
-        print('order creada: ', payment.id)
         metadata = {"type": "extend-rango", "id": rango.id}
     elif data['type'] == 'compra-tickets':
-        print('type es compra tickets')
-        print(data)
+       
         #request['entradas'] = [{'uuid':'xxx', 'amount':2},{'uuid':'yyy','amount':1}] --> 2 normales y 1 VIP i.e.
 
         platform_fee = 0
@@ -2208,17 +2216,15 @@ def createCompraSimple(request):
                     entrada_comprar = EntradasForPlan.objects.get(uuid=entrada['uuid'])
                     seller = UserProfile.objects.get(user = entrada_comprar.activity.creador)
                     activity = entrada_comprar.activity
-                    print('precio etnrada: ', entrada_comprar.precio)
+                 
                     seller_amount += Decimal(entrada_comprar.precio) * Decimal(entrada['amount'])
-                    print('seller_amount: ', seller_amount)
+                   
                     platform_fee +=  (Decimal(seller.platform_fee) / Decimal(100))*Decimal(entrada_comprar.precio)*Decimal(entrada['amount'])
-                    print('platform_fee: ', platform_fee)
+                  
                 except EntradasForPlan.DoesNotExist:
                     return Response('No encontramos las entradas', status =400)
             
-        print('final platform fee: ', platform_fee)
-        print('final seller_amount: ', seller_amount)
-        print('total fee: ', platform_fee+seller_amount)
+     
 
         existing_payment = Payment.objects.filter(
             userProfile=userProfile,
@@ -2246,11 +2252,10 @@ def createCompraSimple(request):
             except Exception as e:
                 return Response(f'Error inesperado al crear payment: {str(e)}', status=500)
             
-        print('payment creada: ', payment.id)
         metadata = {"type": "compra-tickets", "entradas": [{"uuid": e["uuid"], "amount": e["amount"]}for e in data["entradas"] if e["amount"] > 0],"name":data['name'], "email":data['email']}
         successUrl = "golocal://activity/"+str(activity.uuid)
 
-    print(os.environ.get("MP_ACCESS_TOKEN"))
+    
     sdk = mercadopago.SDK(os.environ.get("MP_ACCESS_TOKEN"))
 
     preference_data = {
@@ -2282,7 +2287,6 @@ def createCompraSimple(request):
 
     preference_response = sdk.preference().create(preference_data)
     preference = preference_response.get("response")
-    print('preference mp: ', preference)
     if preference and "init_point" in preference:
         return Response({"init_point": preference["init_point"]}, status=200)
     else:
@@ -2293,7 +2297,6 @@ def createCompraSimple(request):
 @csrf_exempt
 @api_view(['POST'])
 def webhook_mp(request):
-    print('webhook_hitt')
     body = json.loads(request.body.decode("utf-8"))
     
     # Caso 1: webhook tipo payment (más confiable)
@@ -2307,7 +2310,6 @@ def webhook_mp(request):
 
     if payment_id:
         payment_response = sdk.payment().get(payment_id)
-        print('payment_ response: ', payment_response)
         payment = payment_response["response"]
         external_reference = payment.get("external_reference")
         payment_uuid = external_reference.split("_")[1]
@@ -2324,8 +2326,6 @@ def webhook_mp(request):
         payment.payout_status = 'pending'
         payment.status = status
         payment.save()
-
-        print('metadata: ', metadata)
 
         ####SE COMPRO UN BONO DE PLANES GRATIS
         if metadata['type'] == 'compra-bono' and status == 'approved' and not payment.applied:
@@ -2350,7 +2350,6 @@ def webhook_mp(request):
             except PaymentEventsRanges.DoesNotExist:
                 pass
         elif metadata['type'] == 'compra-tickets' and status == 'approved' and not payment.applied:
-            print('entradads de metadata: ', metadata['entradas'])
             tickets = []
             oneTime = True
             for e in metadata['entradas']:

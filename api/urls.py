@@ -1,7 +1,7 @@
 from django.urls import path
 
 from api.serializers import CampoReservaSerializer
-from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_ticket, createCompraSimple, createReserva, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, failureMP, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, pendingMP, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, remove_profile_image, successMP, tags, update_profile_image, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketStatus, updateTicketsLink, user_profile,sign_in,
+from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_ticket, createCompraSimple, createReserva, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, failureMP, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, pendingMP, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, remove_profile_image, sendMailForPwdRecovery, successMP, tags, transactions, update_profile_image, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketStatus, updateTicketsLink, user_profile,sign_in,
                     google_sign_in,updateActivityAssistance,update_user,promos,create_event,user_prorfile_from_uuid,search_users,update_item_details, userCreatedEventsForTheWeek, validate_ticket,soldTicketsForEvent, templates, webhook_mp)
 from django.conf import settings
 from django.conf.urls.static import static
@@ -36,6 +36,7 @@ urlpatterns = [
     path('create_tickets/', create_ticket, name='create_ticket'),
     path('get_tickets/', get_tickets, name="get_tickets"),
     path('create_reserva/', createReserva, name="create-reserva"),
+    
 
     ##Aquí aniran les calls només pel goLocalWeb
     path('events_for_the_week/', userCreatedEventsForTheWeek, name="userCreatedEventsForTheWeek"),
@@ -57,6 +58,9 @@ urlpatterns = [
     path('export-pagos-excel/', export_to_excel, name="export_to_excel"),
     path('register_view/', registerView, name="registerView"),
     path('register_share/', registerShare, name="registerShare"),
+    path('transactions/', transactions, name="transactions"),
+    path('auth/send_mail_for_pwd_reset/', sendMailForPwdRecovery, name="sendMailForPwdRecovery"),
+
 
     #mercadopago
     path('generate_oauth_mp_link/', generateOauthMpLink, name="generate_oauth_mp_link"),
