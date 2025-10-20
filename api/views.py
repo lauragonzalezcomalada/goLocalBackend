@@ -1116,7 +1116,7 @@ def create_event(request):
                 # {"nombre":"Entrada VIP","descripcion":"Conoce al artista","precio":"30000","cantidad":"5"}]
 
 
-        event.creador = user
+        event.creador.user = user
         event.save()
         return Response({'uuid':event.uuid, 'tipo': tipoEvento}, status=201)
     else:
