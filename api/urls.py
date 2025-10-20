@@ -1,7 +1,7 @@
 from django.urls import path
 
 from api.serializers import CampoReservaSerializer
-from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_ticket, createCompraSimple, createReserva, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, failureMP, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, pendingMP, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, remove_profile_image, sendMailForPwdRecovery, successMP, tags, transactions, update_profile_image, updateActiveStatus, updateEntrada, updatePassword, updateReserva, updateReservaStatus, updateTicketStatus, updateTicketsLink, user_profile,sign_in,
+from .views import (CustomTokenObtainPairView, ableToTurnVisible, accept_invitation, add_item, billingStatus, bonos, camposReserva, create_ticket, createCompraSimple, createReserva, createSplitPayment, entradasForUserAdmin, eventosActivos, export_to_excel, failureMP, generateOauthMpLink, get_tickets, hello_world, invitation_redirect, pendingMP, registerShare, registerView, obtainAccessTokenVendedor, paymentEventsRanges, place_detail,get_all_places,activities,private_plans, remove_profile_image, sendMailForPwdRecovery, successMP, tags, transactions, update_profile_image, updateActiveStatus, updateEntrada, updateEvento, updatePassword, updateReserva, updateReservaStatus, updateTicketStatus, updateTicketsLink, user_profile,sign_in,
                     google_sign_in,updateActivityAssistance,update_user,promos,create_event,user_prorfile_from_uuid,search_users,update_item_details, userCreatedEventsForTheWeek, validate_ticket,soldTicketsForEvent, templates, webhook_mp)
 from django.conf import settings
 from django.conf.urls.static import static
@@ -43,6 +43,7 @@ urlpatterns = [
     path('entradas_user_admin/', entradasForUserAdmin, name="entradasForUserAdmin"),
     path('sold_tickets_for_event/',soldTicketsForEvent, name = "soldTicketsForEvent"),
     path('update_entrada/', updateEntrada, name ="updateEntrada"),
+    path('update_evento/', updateEvento, name ="updateEntrada"),
     path('update_reserva/', updateReserva, name = "updateReserva"),
     path('campos_reserva/', camposReserva, name='camposReserva'),   
     path('templates/', templates, name='templates'),

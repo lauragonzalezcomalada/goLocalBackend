@@ -10,13 +10,13 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
-    filter_horizontal = ('tags',)  # Esto permite seleccionar múltiples tags de manera más fácil
+    filter_horizontal = ('tags',)  
     list_display = ['id','name','creador','startDateandtime','gratis','active']
 
 
 class PromoAdmin(admin.ModelAdmin):
     filter_horizontal = ('tags',)
-    list_display = ['name','creador','startDateandtime']
+    list_display = ['name','startDateandtime']
 
 admin.site.register(Promo, PromoAdmin)
 admin.site.register(UserProfile, UserProfileAdmin)

@@ -484,8 +484,8 @@ def billingStatus(request):
     
     first_date, last_date = get_month_bounds()
 
-    activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date))
-    promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date))
+    activities = Activity.objects.filter(creador__user = user, startDateandtime__date__range=(first_date, last_date))
+    promos = Promo.objects.filter(creador__user=user, startDateandtime__date__range=(first_date,last_date))
 
     #paymentReceipt = PaymentForUse.objects.filter(userProfile__user = user, payment_month__date__range = (first_date, last_date))
     
@@ -1307,9 +1307,9 @@ def userCreatedEventsForTheWeek(request):
 
     start_of_week, end_of_week = get_week_range_by_date(date_obj)
 
-    activities = Activity.objects.filter(creador=user, startDateandtime__date__range=(start_of_week, end_of_week))
-    promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(start_of_week, end_of_week))
-    private_plans = PrivatePlan.objects.filter(creador=user,startDateandtime__date__range=(start_of_week, end_of_week))
+    activities = Activity.objects.filter(creador__user=user, startDateandtime__date__range=(start_of_week, end_of_week))
+    promos = Promo.objects.filter(creador__user=user, startDateandtime__date__range=(start_of_week, end_of_week))
+    private_plans = PrivatePlan.objects.filter(creador__user=user,startDateandtime__date__range=(start_of_week, end_of_week))
 
     data = {
         'activities': ActivitySerializer(activities, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes','active']).data,
@@ -1326,7 +1326,10 @@ def entradasForUserAdmin(request):
     if not user.is_authenticated:
         return Response('User not authenticated', status=401)
     
-
+    try:
+        userProfile = UserProfile.objects.get(user=user)
+    except UserProfile.DoesNotExist:
+        return Response('Error in obtaining UserProfile', status=400)
     def procesar_evento(evento, tipo):
         entradas = EntradasForPlan.objects.filter(**{evento_field_map[tipo]: evento})
         entradas_data = []
@@ -1405,7 +1408,7 @@ def entradasForUserAdmin(request):
         2: 'privateplan'
     }
     # Activities
-    for activity in Activity.objects.filter(creador=user):
+    for activity in Activity.objects.filter(creador=userProfile):
         if EntradasForPlan.objects.filter(activity=activity).exists():
             procesar_evento(activity, tipo=0)
 
@@ -1436,7 +1439,7 @@ def entradasForUserAdmin(request):
                 'event_imageUrl': activity.image.url if activity.image else None
             })
     # Promos
-    for promo in Promo.objects.filter(creador=user):
+    for promo in Promo.objects.filter(creador=userProfile):
         if ReservaForm.objects.filter(promo=promo).exists():
             procesar_reservas(promo, tipo=1)
             
@@ -1451,7 +1454,7 @@ def entradasForUserAdmin(request):
                                 'event_imageUrl': promo.image.url if promo.image else None})
 
     # PrivatePlans
-    for plan in PrivatePlan.objects.filter(creador=user):
+    for plan in PrivatePlan.objects.filter(creador=userProfile):
         if EntradasForPlan.objects.filter(privateplan=plan).exists():
             procesar_evento(plan, tipo=2)
 
@@ -1555,6 +1558,37 @@ def soldTicketsForEvent(request):
         }
         return Response(data)
 
+@api_view(['POST'])
+def updateEvento(request):
+    user = request.user
+    if not user.is_authenticated:
+        return Response('User not authenticated', status=401)
+    
+    data = request.data
+    tipo = data['event_type']
+
+    try:
+        if tipo == 0:
+            evento = Activity.objects.get(uuid = data['uuid'])   
+            print('tinc evento')
+            print(evento)
+        elif tipo == 1:
+            evento = Promo.objects.get(uuid = data['uuid'])
+            print('tinc promo')
+    except Activity.DoesNotExist or Promo.DoesNotExist:
+        return Response('Error retrieving object', status = 400)
+    
+    evento.name = data['name']
+    evento.shortDesc = data['shortDesc']
+    evento.desc = data['desc']
+    evento.save()
+
+    if tipo == 0:
+        serializer = ActivitySerializer(data = evento)
+    elif tipo == 1:
+        serializer = PromoSerializer(data = evento)
+
+    return Response(serializer.data, status = 200)
 
 @api_view(['POST'])
 def updateEntrada(request):
@@ -2145,6 +2179,7 @@ from django.views.decorators.csrf import csrf_exempt
 @csrf_exempt
 @api_view(['POST'])
 def createCompraSimple(request):
+    print('crete compra simple: ', request.data)
     user = request.user
     if not user.is_authenticated:
         return Response('User not authenticated', status=401)   
@@ -2161,6 +2196,7 @@ def createCompraSimple(request):
     ##### --> 'compra_tickets'
 
     if data['type'] == 'compra_bono':
+        print('entra al compra bono!')
        
         try:
             bono = Bono.objects.get(uuid = data['uuid'])
@@ -2176,11 +2212,12 @@ def createCompraSimple(request):
                 seller = seller, #jo
                 activity = None,
             )
-           
+            metadata = {"type": "compra-bono", "id": bono.id}
+            successUrl = "https://go-local-web.vercel.app/"
         except Bono.DoesNotExist:
+            print('error que no hi ha bono')
             return Response('Bono no encontrado', status=404)
-        metadata = {"type": "compra-bono", "id": bono.id}
-        successUrl = "https://golocalbackend.onrender.com/api/success/",
+       
 
     elif data['type'] == 'extend_rango':
         try:
@@ -2198,7 +2235,7 @@ def createCompraSimple(request):
                 seller = seller, #jo
                 activity = None,
             )
-            successUrl = "https://golocalbackend.onrender.com/api/success/"
+            successUrl = "https://go-local-web.vercel.app/"
         except PaymentEventsRanges.DoesNotExist:
             return Response('Rango no encontrado', status=404)
         metadata = {"type": "extend-rango", "id": rango.id}
@@ -2214,7 +2251,7 @@ def createCompraSimple(request):
             if entrada['amount'] > 0:
                 try:
                     entrada_comprar = EntradasForPlan.objects.get(uuid=entrada['uuid'])
-                    seller = UserProfile.objects.get(user = entrada_comprar.activity.creador)
+                    seller = entrada_comprar.activity.creador
                     activity = entrada_comprar.activity
                  
                     seller_amount += Decimal(entrada_comprar.precio) * Decimal(entrada['amount'])
@@ -2225,13 +2262,14 @@ def createCompraSimple(request):
                     return Response('No encontramos las entradas', status =400)
             
      
-
+        
         existing_payment = Payment.objects.filter(
             userProfile=userProfile,
             status='pending',
             activity=activity
         ).first()
 
+        
         if existing_payment:
             payment = existing_payment
         else: 
@@ -2255,7 +2293,7 @@ def createCompraSimple(request):
         metadata = {"type": "compra-tickets", "entradas": [{"uuid": e["uuid"], "amount": e["amount"]}for e in data["entradas"] if e["amount"] > 0],"name":data['name'], "email":data['email']}
         successUrl = "golocal://activity/"+str(activity.uuid)
 
-    
+    print('arriba a crear la preferència')
     sdk = mercadopago.SDK(os.environ.get("MP_ACCESS_TOKEN"))
 
     preference_data = {
@@ -2271,8 +2309,8 @@ def createCompraSimple(request):
     },
      "back_urls": {
         "success": successUrl,
-        "failure": "https://golocalbackend.onrender.com/api/failure/",
-        "pending": "https://golocalbackend.onrender.com/api/pending/"
+        "failure": "https://borradoresdeviaje.com/series/series-australia.html",
+        "pending": "https://borradoresdeviaje.com/series/series-tailandia.html"
     },
     "notification_url": "https://golocalbackend.onrender.com/api/webhook_mp/",
 
@@ -2281,7 +2319,9 @@ def createCompraSimple(request):
     # 👇 datos adicionales (opcionales)
     "metadata": metadata,
     }
+
     preference_response = sdk.preference().create(preference_data)
+    print('preference response: ', preference_response)
     warnings.filterwarnings("ignore", category=UserWarning)
 
 

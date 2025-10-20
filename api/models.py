@@ -54,7 +54,7 @@ class Activity(models.Model):
     reserva_necesaria =  models.BooleanField(default=False, blank = True, null = True)
     control_entradas =  models.BooleanField(default=False, blank = True, null = True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='activities')
-    creador = models.ForeignKey(User, on_delete=models.CASCADE, default = 1)
+    creador = models.ForeignKey('UserProfile', on_delete=models.CASCADE, related_name='created_activities', default = 1)
     price = models.FloatField(default = 0.0,validators=[MinValueValidator(0.0)])
     views = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
     shares = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
@@ -80,7 +80,12 @@ class Promo(models.Model):
     endDateandtime = models.DateTimeField(null=True, blank=True)
     repeat = models.BooleanField(default=False)
     tags = models.ManyToManyField(Tag, blank=True, related_name='promos')
-    creador = models.ForeignKey(User, on_delete=models.CASCADE, default = 1)
+    creador = models.ForeignKey( 
+        'UserProfile',
+        on_delete=models.CASCADE,
+        related_name='created_promos',
+        null=True, blank=True,          
+    )
     reserva_necesaria =  models.BooleanField(default=False, blank = True, null = True)
     views = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
     shares = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
@@ -112,12 +117,17 @@ class PrivatePlan(models.Model):
     direccion = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to='private_plans_images/', null=True, blank=True,max_length=1000)
     startDateandtime = models.DateTimeField(null=True, blank=True)
-    creador = models.ForeignKey(User, on_delete=models.CASCADE, default = 1)
+    creador = models.ForeignKey(
+        'UserProfile',
+        on_delete=models.CASCADE,
+        related_name='created_privateplans',
+        null=True, blank=True,
+    )
     gratis = models.BooleanField(default=True)
     reserva_necesaria =  models.BooleanField(default=True)
     price = models.FloatField(default = 0.0)
     invitation_code = models.CharField(max_length=8, unique=True, blank=True, null=True)
-    invited_users = models.ManyToManyField('UserProfile', through='PrivatePlanInvitation', related_name='planes_invitados', blank=True, null = True)
+    invited_users = models.ManyToManyField('UserProfile', through='PrivatePlanInvitation', related_name='planes_invitados', blank = True)
     active = models.BooleanField(default=False)
 
 

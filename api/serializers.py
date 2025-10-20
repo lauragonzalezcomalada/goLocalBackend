@@ -51,7 +51,7 @@ class ReservasFormsSerializer(serializers.ModelSerializer):
     campos = CampoReservaSerializer(many=True, read_only=True)
     class Meta:
         model = ReservaForm
-        fields = ['uuid', 'nombre', 'max_disponibilidad','campos']
+        fields = ['uuid', 'nombre', 'max_disponibilidad','campos','confirmados']
 class EntradasForPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = EntradasForPlan
@@ -245,7 +245,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
         start_month = date.today().replace(day=1)
         end_month = date.today().replace(day=28)
         active_activities_this_month =  Activity.objects.filter(
-            creador=obj.user,
+            creador=obj,
             gratis=False,
             active=True,
             startDateandtime__range=(start_month, end_month)
@@ -282,7 +282,7 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
                 'image': activity.image.url if activity.image else None,
                 'startDateandtime': activity.startDateandtime,
                 'tiene_ticket': has_ticket,
-                'created_by_user': activity.creador == request.user if request else False
+                'created_by_user': activity.creador.user == request.user if request else False
 
             })
             
@@ -312,9 +312,9 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
 
             })
 
-        activities_creadas = Activity.objects.filter(creador=instance.user)
-        promos_creadas = Promo.objects.filter(creador=instance.user)
-        planes_creados = PrivatePlan.objects.filter(creador=instance.user)
+        activities_creadas = Activity.objects.filter(creador=instance)
+        promos_creadas = Promo.objects.filter(creador=instance)
+        planes_creados = PrivatePlan.objects.filter(creador=instance)
 
         for activity in activities_creadas:
             eventos_creados.append({
