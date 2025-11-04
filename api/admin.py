@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib import admin
 # Register your models here.
-from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, MessageToUser, Payment, PaymentEventsRanges, Place,Activity, PrivatePlan, PrivatePlanInvitation, Reserva, ReservaForm,Tag, Ticket,UserProfile,Promo,ItemPlan
+from .models import Bono, CampoReserva, EntradasForPlan, EventReport, EventTemplate, Payment, PaymentEventsRanges, Place,Activity, PrivatePlan, PrivatePlanInvitation, Reserva, ReservaForm,Tag, Ticket,UserProfile,Promo,ItemPlan
 
 
 class UserProfileAdmin(admin.ModelAdmin):
@@ -11,7 +11,7 @@ class UserProfileAdmin(admin.ModelAdmin):
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
     filter_horizontal = ('tags',)  
-    list_display = ['id','name','creador','startDateandtime','gratis','active']
+    list_display = ['id','name','creador','startDateandtime','gratis','active', 'aLaGorra']
 
 
 class PromoAdmin(admin.ModelAdmin):
@@ -84,12 +84,7 @@ class PaymentAdmin(admin.ModelAdmin):
     def activity_name(self, obj):
         return obj.activity.name if obj.activity else "-"
   
-
-admin.site.register(MessageToUser)
-
-
-
-
+admin.site.register(EventReport)
 
 @admin.register(PaymentEventsRanges)
 class PaymentEventsRangesAdmin(admin.ModelAdmin):

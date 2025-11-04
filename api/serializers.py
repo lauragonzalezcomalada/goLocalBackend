@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 from rest_framework import serializers
-from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, MessageToUser, PaymentEventsRanges, Place, Activity, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm,Tag, Ticket,UserProfile, ItemPlan
+from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, PaymentEventsRanges, Place, Activity, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm,Tag, Ticket,UserProfile, ItemPlan
 from django.utils.dateparse import parse_datetime
 
 
@@ -71,21 +71,25 @@ class ActivitySerializer(DynamicFieldsModelSerializer):
     user_isgoing = serializers.SerializerMethodField()
 
     disponibilidad_creacion = serializers.SerializerMethodField()
+    recommendedAmount = serializers.IntegerField( required=False, allow_null=True)
+
     class Meta:
         model = Activity
         fields = '__all__'
     
     def get_creador_image(self, obj):
         user = obj.creador
-        if hasattr(user, 'profile') and user.profile.image:
-            return user.profile.image.url
+        print('user')
+        if hasattr(user, 'profile') and user.user.profile.image:
+            return user.user.profile.image.url
         return None
 
     def get_created_by_user(self, obj):
         # Necesita acceso al usuario del contexto
         request = self.context.get('request', None)
         if request and hasattr(request, 'user'):
-            return obj.creador == request.user
+            
+            return obj.creador.user == request.user
         return False
     
     def get_user_isgoing(self, obj):
@@ -149,10 +153,7 @@ class PromoSerializer(DynamicFieldsModelSerializer):
         # Necesita acceso al usuario del contexto
         request = self.context.get('request', None)
         if request and hasattr(request, 'user'):
-            print("creador:", obj.creador, obj.creador.id)
-            print("request.user:", request.user, request.user.id)
-            print("comparación:", obj.creador == request.user)
-            return obj.creador.id == request.user.id
+            return obj.creador.user == request.user
         return False
     
     def get_user_isgoing(self, obj):
@@ -171,13 +172,6 @@ class PaymentEventsRangesSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentEventsRanges
         fields = ['uuid', 'name', 'start_range', 'end_range', 'price']
-
-class MessageToUserSerializer(serializers.ModelSerializer):
-     class Meta:
-        model = MessageToUser
-        fields = ['uuid','dateTime', 'message','read']  
-
-
 
 class UserProfileSerializerForQR(DynamicFieldsModelSerializer):
     today_activities = serializers.SerializerMethodField()
@@ -226,16 +220,12 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)  # Nombre de usuario
     email = serializers.CharField(source='user.email', read_only=True) #email
     payment_events_range = PaymentEventsRangesSerializer(read_only=True)   # activity_detail = ActivitySerializer(required=False, many=True,read_only=True, source='activities')
-    unread_messages = serializers.SerializerMethodField()
     can_create_free_plan = serializers.SerializerMethodField()
     can_create_payment_plan = serializers.SerializerMethodField()
     class Meta:
         model = UserProfile
-        fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'can_create_free_plan', 'can_create_payment_plan','payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual','unread_messages']
+        fields =['uuid','user', 'username', 'email', 'bio', 'birth_date', 'creation_date', 'location', 'locationId', 'image', 'tags', 'activities', 'promos','siguiendo', 'telefono', 'can_create_free_plan', 'can_create_payment_plan','payment_events_range', 'creador', 'pago_suscripcion_mes_proximo',  'pago_suscripcion_mes_actual']
 
-    def get_unread_messages(self, obj):
-        unread_qs = obj.messages.filter(read=False)
-        return MessageToUserSerializer(unread_qs, many=True).data
     
     def get_can_create_free_plan(self,obj):
         return obj.available_planes_gratis > 0
@@ -362,16 +352,45 @@ class UserProfileSerializer(DynamicFieldsModelSerializer):
         #        dt = timezone.make_aware(dt, timezone.get_default_timezone())
         #    evento['date_time'] = dt
 
-        eventos.sort(key=lambda e: (e['startDateandtime'] < now, e['startDateandtime']))
-        eventos_creados.sort(key=lambda e: (e['startDateandtime'] < now, e['startDateandtime']))
+        #eventos.sort(key=lambda e: (e['startDateandtime'] < now, e['startDateandtime']))
+        #eventos_creados.sort(key=lambda e: (e['startDateandtime'] < now, e['startDateandtime']))
         
         
+        #rep['eventos'] = eventos
+        #rep['eventos_creados'] = eventos_creados
+
+        #print('eventos creados: ', eventos_creados)
+
+       # return rep  
+        def safe_datetime(dt):
+            if isinstance(dt, str):
+                dt = parse_datetime(dt)
+            if dt is not None and timezone.is_naive(dt):
+                dt = timezone.make_aware(dt, timezone.get_default_timezone())
+            return dt
+
+        # Normaliza todas las fechas
+        for lista in (eventos, eventos_creados):
+            for e in lista:
+                e['startDateandtime'] = safe_datetime(e['startDateandtime'])
+
+        # 🔹 Ordena primero los eventos futuros (más cercanos), luego los pasados (más recientes)
+        def sort_key(e):
+            dt = e['startDateandtime'] or now
+            # eventos futuros → primero, orden ascendente
+            if dt >= now:
+                return (0, abs((dt - now).total_seconds()))
+            # eventos pasados → después, también orden ascendente (más reciente primero)
+            else:
+                return (1, abs((now - dt).total_seconds()))
+
+        eventos.sort(key=sort_key)
+        eventos_creados.sort(key=sort_key)
+
         rep['eventos'] = eventos
         rep['eventos_creados'] = eventos_creados
 
-        print('eventos creados: ', eventos_creados)
-
-        return rep    
+        return rep  
 
 class ItemSerializer(serializers.ModelSerializer):
     people_in_charge = UserProfileBasicSerializer(many=True, read_only=True)

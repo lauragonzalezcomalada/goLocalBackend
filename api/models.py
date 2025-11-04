@@ -35,68 +35,54 @@ class Tag(models.Model):
 
     def __str__(self):
         return self.name
-    
-    
-class Activity(models.Model):
-    
+
+
+class Event(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True)
     name = models.CharField(max_length=100)
-    shortDesc = models.CharField(max_length = 144, null=True, blank = True)
-    desc = models.TextField(blank = True)
-    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='activities',null=True,blank=True)
+    shortDesc = models.CharField(max_length=144, null=True, blank=True)
+    desc = models.TextField(blank=True)
+    place = models.ForeignKey(
+        Place, on_delete=models.CASCADE, related_name='%(class)s_events',
+        null=True, blank=True
+    )
     lat = models.FloatField(null=True)
     long = models.FloatField(null=True)
     direccion = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to='activities_images/', null=True, blank=True,max_length=1000)
+    image = models.ImageField(upload_to='event_images/', null=True, blank=True, max_length=1000)
     startDateandtime = models.DateTimeField(null=True, blank=True)
+    tags = models.ManyToManyField(Tag, blank=True, related_name='%(class)s_tags')
+    creador = models.ForeignKey(
+        'UserProfile', on_delete=models.CASCADE,
+        related_name='%(class)s_created', null=True, blank=True
+    )
+    views = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    shares = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    active = models.BooleanField(default=False)
+    colaboradores = models.ManyToManyField('UserProfile', blank=True, related_name='%(class)s_collaborated')
+
+    class Meta:
+        abstract = True  # 👈 Esto evita crear una tabla “Event” real
+
+    def __str__(self):
+        return self.name
+
+    
+class Activity(Event):
     tickets_link = models.CharField(max_length=100, null=True, blank=True)
     gratis = models.BooleanField(default=True)
-    reserva_necesaria =  models.BooleanField(default=False, blank = True, null = True)
-    control_entradas =  models.BooleanField(default=False, blank = True, null = True)
-    tags = models.ManyToManyField(Tag, blank=True, related_name='activities')
-    creador = models.ForeignKey('UserProfile', on_delete=models.CASCADE, related_name='created_activities', default = 1)
-    price = models.FloatField(default = 0.0,validators=[MinValueValidator(0.0)])
-    views = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
-    shares = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
-    clicks_on_tickets_link = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
-    active = models.BooleanField(default=False)
-    colaboradores = models.ManyToManyField('UserProfile', related_name='activities_collaborated', blank=True)
+    aLaGorra = models.BooleanField(default=False)
+    recommendedAmount = models.IntegerField(blank=True, null=True)
+    reserva_necesaria = models.BooleanField(default=False)
+    control_entradas = models.BooleanField(default=False)
+    price = models.FloatField(default=0.0, validators=[MinValueValidator(0.0)])
+    clicks_on_tickets_link = models.IntegerField(default=0, validators=[MinValueValidator(0)])
 
 
-    def __str__(self):
-        return self.name
-    
-class Promo(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, unique=True)
-    name = models.CharField(max_length=100)
-    shortDesc = models.CharField(max_length = 144, null=True, blank = True)
-    desc = models.TextField(blank = True)
-    place = models.ForeignKey(Place, on_delete=models.CASCADE, related_name='promos',null=True,blank=True)
-    lat = models.FloatField(null=True)
-    long = models.FloatField(null=True)
-    direccion = models.TextField(blank=True, null=True)
-    image = models.ImageField(upload_to='promo_images/', null=True, blank=True,max_length=1000)
-    startDateandtime = models.DateTimeField(null=True, blank=True)
+class Promo(Event):
     endDateandtime = models.DateTimeField(null=True, blank=True)
     repeat = models.BooleanField(default=False)
-    tags = models.ManyToManyField(Tag, blank=True, related_name='promos')
-    creador = models.ForeignKey( 
-        'UserProfile',
-        on_delete=models.CASCADE,
-        related_name='created_promos',
-        null=True, blank=True,          
-    )
-    reserva_necesaria =  models.BooleanField(default=False, blank = True, null = True)
-    views = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
-    shares = models.IntegerField(default = 0,validators=[MinValueValidator(0)])
-    active = models.BooleanField(default=False)
-    colaboradores = models.ManyToManyField('UserProfile', related_name='promos_collaborated', blank=True)
-
-
-
-
-    def __str__(self):
-        return self.name
+    reserva_necesaria = models.BooleanField(default=False)
 
 
 def generate_invitation_code(length=8):
@@ -293,7 +279,6 @@ class ReservaForm(models.Model):
     campos = models.ManyToManyField('CampoReserva', related_name='formularios', blank=True)
     confirmados = models.PositiveIntegerField(default = 0)
 
-
     def disponibles(self):
         # método para calcular disponibilidad restante
         return self.max_disponibilidad - self.reservas.count()
@@ -302,7 +287,6 @@ class ReservaForm(models.Model):
 
 
 class Reserva(models.Model):
-
     STATUS_CHOICES = [
         (0, 'No asistido'),
         (1, 'Asistido')
@@ -364,13 +348,30 @@ class Payment(models.Model):
     def __str__(self):
         return f"Payment {self.payment_id} - {self.status}" 
 
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 
-class MessageToUser(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4, editable=True, unique=True)
-    dateTime = models.DateTimeField(auto_now_add=True)
-    message = models.TextField(blank = False, null = False)
-    userProfile = models.ManyToManyField(
-            'UserProfile',
-            related_name='messages'
-        )
-    read =  models.BooleanField(default=False)
+class EventReport(models.Model):
+    REASON_CHOICES = [
+        ('inappropriate', 'Contenido inapropiado'),
+        ('duplicate', 'Evento duplicado'),
+        ('spam', 'Spam o publicidad'),
+        ('false_info', 'Información falsa'),
+        ('other', 'Otro'),
+    ]
+
+    reason = models.CharField(max_length=50, choices=REASON_CHOICES)
+    description = models.TextField(blank=True, null=True)
+    user = models.ForeignKey(UserProfile,on_delete=models.CASCADE,related_name='reports')
+
+    activity = models.ForeignKey(Activity, on_delete=models.CASCADE,null=True, blank=True, related_name='reports')
+    promo = models.ForeignKey(Promo, on_delete=models.CASCADE,null=True, blank=True, related_name='reports')
+
+    date_reported = models.DateTimeField(auto_now_add=True)
+    reviewed = models.BooleanField(default=False)
+    solved = models.BooleanField(default=False)
+    review_notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        target = self.activity or self.promo
+        return f"Reporte de {self.user} sobre {target} ({self.get_reason_display()})"

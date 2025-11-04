@@ -74,9 +74,9 @@ def place_detail(request):
 
 @api_view(['GET'])
 def activities(request): #hacer doble view
-    if request.method == 'GET':
+    
        # place_uuid = request.query_params.get('place_uuid',None)
-        activity_uuid = request.query_params.get('activity_uuid',None)
+    activity_uuid = request.query_params.get('activity_uuid',None)
 
       # if place_uuid:
       #      try:
@@ -92,20 +92,20 @@ def activities(request): #hacer doble view
 
       #      serializer = ActivitySerializer(activities, many=True, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'])
       #      return Response(serializer.data)
-        if activity_uuid:
-                try: 
-                    activity = Activity.objects.get(uuid=activity_uuid)
-                except Activity.DoesNotExist:
-                    return Response({'error': 'No activity found according to your uuid'}, status=404)
-
-                serializer = ActivitySerializer(activity,context={'request': request})
-                return Response(serializer.data)
-        else:
-            activities = Activity.objects.filter(startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
-            if not activities.exists:
-                return Response({'error': 'No activities found'}, status=404)   
-            serializer = ActivitySerializer(activities, many=True) #, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'], context={'request': request})     
-            return Response(serializer.data)
+    if activity_uuid:
+        try: 
+            activity = Activity.objects.get(uuid=activity_uuid)
+        except Activity.DoesNotExist:
+            return Response({'error': 'No activity found according to your uuid'}, status=404)
+        
+        serializer = ActivitySerializer(activity,context={'request': request})
+        return Response(serializer.data)
+    else:
+        activities = Activity.objects.filter(startDateandtime__gte=timezone.now(),active=True).order_by('startDateandtime')
+        if not activities.exists:
+            return Response({'error': 'No activities found'}, status=404)   
+        serializer = ActivitySerializer(activities, many=True) #, fields=['uuid','name','shortDesc','place_name','image','startDateandtime','tag_detail','gratis','creador_image','asistentes'], context={'request': request})     
+        return Response(serializer.data)
             #return Response({'error':'Neither place or activity submitted'},status=404)
     
         
@@ -652,18 +652,22 @@ def ableToTurnVisible(request):
         return Response('Such user does not exist', status = 400)
     
     first_date, last_date = get_month_bounds()
+    print('first_date: ', first_date)
+    print('free_event: ', request.data['free_event'])
     status = None
     if request.data['free_event'] == True: #Planes gratuitos
+        print('free event')
         available_free_plans_fromUP = userProfile.available_planes_gratis # valor máximo que tiene para el mes
-        activities = Activity.objects.filter(creador = user, startDateandtime__date__range=(first_date, last_date), gratis = True, active = True)
-        promos = Promo.objects.filter(creador=user, startDateandtime__date__range=(first_date,last_date), active = True)
+        activities = Activity.objects.filter(creador__user = user, startDateandtime__date__range=(first_date, last_date), gratis = True, active = True)
+        promos = Promo.objects.filter(creador__user=user, startDateandtime__date__range=(first_date,last_date), active = True)
         created_free_events = activities.count() + promos.count()
         available_free_plans = available_free_plans_fromUP-created_free_events
         status = available_free_plans > 0
     else: #Planes pagos
-        activities = Activity.objects.filter(creador=user, startDateandtime__date__range=(first_date, last_date), gratis = False, active = True)
+        print('payment event')
+        activities = Activity.objects.filter(creador__user=user, startDateandtime__date__range=(first_date, last_date), gratis = False, active = True)
         status = activities.count() < userProfile.payment_events_range.end_range
-
+    print('status')
 
     return Response(status, status = 200)   
 
@@ -870,6 +874,9 @@ def update_user(request):
         if 'email' in data:
             user.user.email = data['email']
             user.user.save()
+        if 'asCreator' in data:
+            user.creador = bool(data['asCreator'])
+
         user.save()
         return Response({'user_uuid': user.uuid}, status=200)
 
@@ -1007,6 +1014,11 @@ def create_event(request):
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=401)
 
+    try: 
+        userProfile = UserProfile.objects.get(user=user)
+    except UserProfile.DoesNotExist:
+        return Response('Unable to retrieve UserProfile from User instance', status = 403)
+
     data = request.data
     if isinstance(data, QueryDict):
         data._mutable = True
@@ -1116,12 +1128,15 @@ def create_event(request):
                 # {"nombre":"Entrada VIP","descripcion":"Conoce al artista","precio":"30000","cantidad":"5"}]
 
 
-        event.creador.user = user
+        event.creador = userProfile
+        
         event.save()
         return Response({'uuid':event.uuid, 'tipo': tipoEvento}, status=201)
     else:
         print('serializer errors:', serializer.errors)
     return Response(serializer.errors, status=400)
+
+
 
 
 @api_view(['GET'])
@@ -1408,7 +1423,7 @@ def entradasForUserAdmin(request):
         2: 'privateplan'
     }
     # Activities
-    for activity in Activity.objects.filter(creador=userProfile):
+    for activity in Activity.objects.filter(creador=userProfile, active = True):
         if EntradasForPlan.objects.filter(activity=activity).exists():
             procesar_evento(activity, tipo=0)
 
@@ -1439,7 +1454,7 @@ def entradasForUserAdmin(request):
                 'event_imageUrl': activity.image.url if activity.image else None
             })
     # Promos
-    for promo in Promo.objects.filter(creador=userProfile):
+    for promo in Promo.objects.filter(creador=userProfile, active=True):
         if ReservaForm.objects.filter(promo=promo).exists():
             procesar_reservas(promo, tipo=1)
             
@@ -1516,7 +1531,7 @@ def soldTicketsForEvent(request):
     if tipo_tickets == 0 and tipo == 0: #means Tickets y Activity. Solo se pueden comprar tickets en las activities
        
         try:
-            tickets = Ticket.objects.filter(entrada__activity__uuid = event_uuid, entrada__activity__creador = user)
+            tickets = Ticket.objects.filter(entrada__activity__uuid = event_uuid, entrada__activity__creador__user = user)
         except Ticket.DoesNotExist:
             return Response('No hi ha tickets per aquesta activitat', status = 404)
         
@@ -1751,8 +1766,6 @@ def templates(request):
         if not user.is_authenticated:
             return Response('User not authenticated', status=401)
         data = request.data.copy()
-
-        
         template = EventTemplate.objects.create(
             name = data['name'],
             tipoEvento = data['tipoEvento'],
@@ -2293,6 +2306,7 @@ def createCompraSimple(request):
         metadata = {"type": "compra-tickets", "entradas": [{"uuid": e["uuid"], "amount": e["amount"]}for e in data["entradas"] if e["amount"] > 0],"name":data['name'], "email":data['email']}
         successUrl = "golocal://activity/"+str(activity.uuid)
 
+   
     print('arriba a crear la preferència')
     sdk = mercadopago.SDK(os.environ.get("MP_ACCESS_TOKEN"))
 
