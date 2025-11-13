@@ -27,22 +27,35 @@ from django.core.mail import EmailMessage
 def hello_world(request):
     return Response({'message': 'Hello from Django!'})
 
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
-        data = super().validate(attrs)
+        try:
+            data = super().validate(attrs)
+        except AuthenticationFailed:
+            raise AuthenticationFailed("Email o contraseña incorrectos.")
+        
         require_creador = self.context['request'].data.get('require_creador', False)
       
         if require_creador:
             user = self.user
-        
             if not hasattr(user, 'profile') or not user.profile.creador:
-                raise PermissionDenied("El usuario no tiene permisos de creador") #codigo 403
+                raise PermissionDenied("Este usuario no tiene permisos de creador") #codigo 403
         return data
     
 class CustomTokenObtainPairView(TokenObtainPairView):
+    print('hit el custom token view')
     serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except AuthenticationFailed as e:
+            return Response({'detail': str(e)}, status=401)
+        except PermissionDenied as e:
+            return Response({'detail': str(e)}, status=403)
 
 @api_view(['GET'])
 def get_all_places(request):
@@ -1154,7 +1167,7 @@ def private_plans(request):
 
     user = request.user
     privatePlanUuid = request.GET.get('privatePlanUuid','')
-
+    print('privatePlanUuid: ', privatePlanUuid)
     #Generic per tenir els privatePlans d'un user
     if not privatePlanUuid:
         try:
@@ -1618,7 +1631,7 @@ def updateEntrada(request):
     entrada = []
     try:
         if tipo == 0:
-            entrada = EntradasForPlan.objects.get(uuid = entrada_uuid, activity__creador = user)
+            entrada = EntradasForPlan.objects.get(uuid = entrada_uuid, activity__creador__user = user)
       #  elif tipo == 1: 
       #      entrada =  EntradasForPlan.objects.get(uuid=entrada_uuid, promo__creador = user)
       #  elif tipo == 2:
@@ -1653,9 +1666,9 @@ def updateReserva(request):
 
     try:
         if tipo == 0:
-            reserva = ReservaForm.objects.get(uuid = reserva_uuid, activity__creador = user)
+            reserva = ReservaForm.objects.get(uuid = reserva_uuid, activity__creador__user = user)
         elif tipo == 1: 
-            reserva =  ReservaForm.objects.get(uuid=reserva_uuid, promo__creador = user)
+            reserva =  ReservaForm.objects.get(uuid=reserva_uuid, promo__creador__user = user)
         
     except EntradasForPlan.DoesNotExist:
         return Response('No existeix el tipus de entrada', status = 404)

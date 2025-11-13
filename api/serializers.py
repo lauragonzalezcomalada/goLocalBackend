@@ -3,8 +3,18 @@ from zoneinfo import ZoneInfo
 from rest_framework import serializers
 from .models import Bono, CampoReserva, EntradasForPlan, EventTemplate, PaymentEventsRanges, Place, Activity, PrivatePlan, PrivatePlanInvitation, Promo, Reserva, ReservaForm,Tag, Ticket,UserProfile, ItemPlan
 from django.utils.dateparse import parse_datetime
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+class CreatorTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
 
+        user = self.user
+        if not hasattr(user, 'userprofile') or not user.userprofile.creador:
+            raise serializers.ValidationError("No tienes permisos para acceder como creador")
+
+        return data
+    
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
     """
     Un ModelSerializer que permite especificar dinámicamente los campos a incluir.
